@@ -42,6 +42,8 @@ dependencies:
 
 library:
   source-dirs: src
+  dependencies:
+    - Cabal
 
 executables:
   compiladores-exe:

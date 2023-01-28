@@ -46,13 +46,13 @@ prompt = "FD4> "
 data Mode =
     Interactive
   | Typecheck
-  -- | InteractiveCEK
-  -- | Bytecompile 
-  -- | RunVM
-  -- | CC
-  -- | Canon
-  -- | LLVM
-  -- | Build
+-- | InteractiveCEK
+-- | Bytecompile 
+-- | RunVM
+-- | CC
+-- | Canon
+-- | LLVM
+-- | Build
 
 -- | Parser de banderas
 parseMode :: Parser (Mode,Bool)

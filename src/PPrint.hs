@@ -20,8 +20,8 @@ import Subst ( open, openN )
 
 import Data.Text ( unpack )
 import Prettyprinter.Render.Terminal
-  ( renderStrict, italicized, bold, color, colorDull, Color (..), AnsiStyle )
-import Data.Text.Prettyprint.Doc
+  ( renderStrict, italicized, color, colorDull, Color (..), AnsiStyle )
+import Prettyprinter
  --( (<+>), nest, parens, sep, pretty, Doc, layoutSmart, defaultLayoutOptions, annotate )
 import MonadFD4
 import Global
@@ -58,12 +58,19 @@ openAll ns (Let p v ty m n) =
     in  Let p v' ty (openAll ns m) (openAll (v':ns) (open v' n))
 
 --Colores
+constColor :: Doc AnsiStyle -> Doc AnsiStyle
 constColor = annotate (color Red)
+opColor :: Doc AnsiStyle -> Doc AnsiStyle
 opColor = annotate (colorDull Green)
+keywordColor :: Doc AnsiStyle -> Doc AnsiStyle
 keywordColor = annotate (colorDull Green) -- <> bold)
+typeColor :: Doc AnsiStyle -> Doc AnsiStyle
 typeColor = annotate (color Blue <> italicized)
+typeOpColor :: Doc AnsiStyle -> Doc AnsiStyle
 typeOpColor = annotate (colorDull Blue)
+defColor :: Doc AnsiStyle -> Doc AnsiStyle
 defColor = annotate (colorDull Magenta <> italicized)
+nameColor :: Doc AnsiStyle -> Doc AnsiStyle
 nameColor = id
 
 -- | Pretty printer de nombres (Doc)

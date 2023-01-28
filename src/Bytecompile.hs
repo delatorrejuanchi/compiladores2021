@@ -15,15 +15,12 @@ module Bytecompile
  where
 
 import Lang 
-import Subst
 import MonadFD4
 
 import qualified Data.ByteString.Lazy as BS
 import Data.Binary ( Word32, Binary(put, get), decode, encode )
 import Data.Binary.Put ( putWord32le )
 import Data.Binary.Get ( getWord32le, isEmpty )
-
-import Data.Char
 
 type Opcode = Int
 type Bytecode = [Int]

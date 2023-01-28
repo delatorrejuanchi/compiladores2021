@@ -1,6 +1,6 @@
 module C ( ir2C ) where
-import Data.Text.Prettyprint.Doc
-import Data.Text.Prettyprint.Doc.Render.Terminal ( renderStrict )
+import Prettyprinter
+import Prettyprinter.Render.Terminal (renderStrict)
 import IR
 import Lang
 import Data.Text (unpack)
