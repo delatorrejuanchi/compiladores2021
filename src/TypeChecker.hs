@@ -9,17 +9,17 @@ Stability   : experimental
 -}
 module TypeChecker (
    tc,
-   tcDecl 
+   tcDecl
    ) where
 
-import Lang
-import Global
-import MonadFD4
-import PPrint
-import Subst
+import           Global
+import           Lang
+import           MonadFD4
+import           PPrint
+import           Subst
 
 
--- | 'tc' chequea y devuelve el tipo de un término 
+-- | 'tc' chequea y devuelve el tipo de un término
 -- Si el término no está bien tipado, lanza un error
 -- usando la interfaz de las mónadas @MonadFD4@.
 tc :: MonadFD4 m => Term         -- ^ término a chequear
@@ -28,12 +28,12 @@ tc :: MonadFD4 m => Term         -- ^ término a chequear
 tc (V p (Bound _)) _ = failPosFD4 p "typecheck: No deberia haber variables Bound"
 tc (V p (Free n)) bs = case lookup n bs of
                            Nothing -> failPosFD4 p $ "Variable no declarada "++ppName n
-                           Just ty -> return ty 
+                           Just ty -> return ty
 tc (V p (Global n)) bs = case lookup n bs of
                            Nothing -> failPosFD4 p $ "Variable no declarada "++ppName n
                            Just ty -> return ty
 tc (Const _ (CNat n)) _ = return NatTy
-tc (Print p str t) bs = do 
+tc (Print p str t) bs = do
       ty <- tc t bs
       expect NatTy ty t
 tc (IfZ p c t t') bs = do
@@ -70,22 +70,22 @@ tc (BinaryOp p op t u) bs = do
          uty <- tc t bs
          expect NatTy uty u
 
--- | @'typeError' t s@ lanza un error de tipo para el término @t@ 
-typeError :: MonadFD4 m => Term   -- ^ término que se está chequeando  
-                        -> String -- ^ mensaje de error
+-- | @'typeError' t s@ lanza un error de tipo para el término @t@
+typeError :: MonadFD4 m => Term   -- término que se está chequeando
+                        -> String -- mensaje de error
                         -> m a
-typeError t s = do 
+typeError t s = do
    ppt <- pp t
    failPosFD4 (getInfo t) $ "Error de tipo en "++ppt++"\n"++s
- 
+
 -- | 'expect' chequea que el tipo esperado sea igual al que se obtuvo
 -- y lanza un error si no lo es.
-expect :: MonadFD4 m => Ty    -- ^ tipo esperado
-                     -> Ty    -- ^ tipo que se obtuvo
-                     -> Term  -- ^ término que se está chequeando
+expect :: MonadFD4 m => Ty    -- tipo esperado
+                     -> Ty    -- tipo que se obtuvo
+                     -> Term  -- término que se está chequeando
                      -> m Ty
-expect ty ty' t = if ty == ty' then return ty 
-                               else typeError t $ 
+expect ty ty' t = if ty == ty' then return ty
+                               else typeError t $
               "Tipo esperado: "++ ppTy ty
             ++"\npero se obtuvo: "++ ppTy ty'
 
@@ -102,8 +102,8 @@ tcDecl (Decl p n t) = do
     --chequear si el nombre ya está declarado
     mty <- lookupTy n
     case mty of
-        Nothing -> do  --no está declarado 
+        Nothing -> do  --no está declarado
                   s <- get
-                  ty <- tc t (tyEnv s)                 
+                  ty <- tc t (tyEnv s)
                   addTy n ty
         Just _  -> failPosFD4 p $ n ++" ya está declarado"

@@ -15,19 +15,20 @@ module PPrint (
     ppDecl
     ) where
 
-import Lang
-import Subst ( open, openN )
+import           Lang
+import           Subst                         (open, openN)
 
-import Data.Text ( unpack )
-import Prettyprinter.Render.Terminal
-  ( renderStrict, italicized, color, colorDull, Color (..), AnsiStyle )
-import Prettyprinter
+import           Data.Text                     (unpack)
+import           Prettyprinter
+import           Prettyprinter.Render.Terminal (AnsiStyle, Color (..), color,
+                                                colorDull, italicized,
+                                                renderStrict)
  --( (<+>), nest, parens, sep, pretty, Doc, layoutSmart, defaultLayoutOptions, annotate )
-import MonadFD4
-import Global
+import           Global
+import           MonadFD4
 
 freshen :: [Name] -> Name -> Name
-freshen ns n = let cands = n : (map (\i -> n ++ show i) [0..]) 
+freshen ns n = let cands = n : (map (\i -> n ++ show i) [0..])
                in head (filter (\m -> not (elem m ns)) cands)
 
 -- | 'openAll' convierte términos locally nameless
@@ -35,26 +36,26 @@ freshen ns n = let cands = n : (map (\i -> n ++ show i) [0..])
 -- Debe tener cuidado de no abrir términos con nombres que ya fueron abiertos.
 -- Estos nombres se encuentran en la lista ns (primer argumento).
 openAll :: [Name] -> Term -> NTerm
-openAll ns (V p v) = case v of 
-      Bound i ->  V p $ "(Bound "++show i++")" --este caso no debería aparecer
+openAll ns (V p v) = case v of
+      Bound i  ->  V p $ "(Bound "++show i++")" --este caso no debería aparecer
                                                --si el término es localmente cerrado
-      Free x -> V p x
+      Free x   -> V p x
       Global x -> V p x
 openAll ns (Const p c) = Const p c
-openAll ns (Lam p x ty t) = 
-  let x' = freshen ns x 
+openAll ns (Lam p x ty t) =
+  let x' = freshen ns x
   in Lam p x' ty (openAll (x':ns) (open x' t))
 openAll ns (App p t u) = App p (openAll ns t) (openAll ns u)
-openAll ns (Fix p f fty x xty t) = 
-  let 
+openAll ns (Fix p f fty x xty t) =
+  let
     x' = freshen ns x
     f' = freshen (x':ns) f
   in Fix p f' fty x' xty (openAll (x:f:ns) (openN [f',x'] t))
 openAll ns (IfZ p c t e) = IfZ p (openAll ns c) (openAll ns t) (openAll ns e)
 openAll ns (Print p str t) = Print p str (openAll ns t)
 openAll ns (BinaryOp p op t u) = BinaryOp p op (openAll ns t) (openAll ns u)
-openAll ns (Let p v ty m n) = 
-    let v'= freshen ns v 
+openAll ns (Let p v ty m n) =
+    let v'= freshen ns v
     in  Let p v' ty (openAll ns m) (openAll (v':ns) (open v' n))
 
 --Colores
@@ -85,7 +86,7 @@ ppName = id
 ty2doc :: Ty -> Doc AnsiStyle
 ty2doc NatTy     = typeColor (pretty "Nat")
 ty2doc (FunTy x@(FunTy _ _) y) = sep [parens (ty2doc x), typeOpColor (pretty "->"),ty2doc y]
-ty2doc (FunTy x y) = sep [ty2doc x, typeOpColor (pretty "->"),ty2doc y] 
+ty2doc (FunTy x y) = sep [ty2doc x, typeOpColor (pretty "->"),ty2doc y]
 
 -- | Pretty printer para tipos (String)
 ppTy :: Ty -> String
@@ -101,16 +102,16 @@ binary2doc Sub = opColor (pretty "-")
 collectApp :: NTerm -> (NTerm, [NTerm])
 collectApp t = go [] t where
   go ts (App _ h tt) = go (tt:ts) h
-  go ts h = (h, ts)
+  go ts h            = (h, ts)
 
 parenIf :: Bool -> Doc a -> Doc a
 parenIf True = parens
-parenIf _ = id
+parenIf _    = id
 
 -- t2doc at t :: Doc
 -- at: debe ser un átomo
 -- | Pretty printing de términos (Doc)
-t2doc :: Bool     -- Debe ser un átomo? 
+t2doc :: Bool     -- Debe ser un átomo?
       -> NTerm    -- término a mostrar
       -> Doc AnsiStyle
 -- Uncomment to use the Show instance for STerm
@@ -178,11 +179,11 @@ render = unpack . renderStrict . layoutSmart defaultLayoutOptions
 
 -- | Pretty printing de declaraciones
 ppDecl :: MonadFD4 m => Decl Term -> m String
-ppDecl (Decl p x t) = do 
+ppDecl (Decl p x t) = do
   gdecl <- gets glb
   return (render $ sep [defColor (pretty "let")
-                       , name2doc x 
-                       , defColor (pretty "=")] 
+                       , name2doc x
+                       , defColor (pretty "=")]
                    <+> nest 2 (t2doc False (openAll (map declName gdecl) t)))
-                         
+
 

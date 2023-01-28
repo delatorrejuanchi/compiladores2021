@@ -1,9 +1,9 @@
 module C ( ir2C ) where
-import Prettyprinter
-import Prettyprinter.Render.Terminal (renderStrict)
-import IR
-import Lang
-import Data.Text (unpack)
+import           Data.Text                     (unpack)
+import           IR
+import           Lang
+import           Prettyprinter
+import           Prettyprinter.Render.Terminal (renderStrict)
 
 decl2doc :: IrDecl -> Doc a
 decl2doc (IrVal n t) = pretty "void*" <+> name n <> semi
@@ -12,7 +12,7 @@ decl2doc (IrFun n args t) =
   braces (nest 2 (line <> pretty "return" <+> voidptr <> parens (ir2doc t) <> semi) <> line)
 
 fd4Main :: [IrDecl] -> Doc a
-fd4Main xs = pretty "uint64_t* fd4main()" 
+fd4Main xs = pretty "uint64_t* fd4main()"
          <+> braces (nest 2 (line <> vsep (vals2doc xs ++ [pretty "return 0;"])) <> line)
   where vals2doc :: [IrDecl] -> [Doc a]
         vals2doc []               = []
@@ -27,7 +27,7 @@ stmt :: Doc a -> Doc a
 stmt x = parens (braces (nest 2 (line <> x <> semi) <> line))
 
 stmts:: [Doc a] -> Doc a
-stmts xs = parens $ braces $ 
+stmts xs = parens $ braces $
      foldr (\x ds -> nest 2 (line <> x <> semi) <> ds) line xs
 
 u64 :: Doc a
@@ -54,9 +54,9 @@ op2doc Add = pretty "+"
 op2doc Sub = pretty "-"
 
 prelude :: Doc a
-prelude = pretty "#include <inttypes.h>" 
+prelude = pretty "#include <inttypes.h>"
        <> line
-       <> pretty "#include <wchar.h>" 
+       <> pretty "#include <wchar.h>"
        <> line
        <> pretty "extern void *fd4_mkclosure(void*, int, ...);"
        <> line

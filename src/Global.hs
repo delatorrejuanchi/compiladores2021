@@ -9,14 +9,14 @@ Stability   : experimental
 -}
 module Global where
 
-import Lang
+import           Lang
 
 data GlEnv = GlEnv {
-  inter :: Bool,        --  ^ True, si estamos en modo interactivo.
-  lfile :: String,      -- ^ Último archivo cargado.
-  cantDecl :: Int,      -- ^ Cantidad de declaraciones desde la última carga
-  glb :: [Decl Term],   -- ^ Entorno con declaraciones globales
-  tyEnv :: [(Name,Ty)]  -- ^ Entorno de tipado de declaraciones globales
+  inter    :: Bool,        -- True, si estamos en modo interactivo.
+  lfile    :: String,      -- Último archivo cargado.
+  cantDecl :: Int,         -- Cantidad de declaraciones desde la última carga
+  glb      :: [Decl Term], -- Entorno con declaraciones globales
+  tyEnv    :: [(Name,Ty)]  -- Entorno de tipado de declaraciones globales
 }
 
 -- | Valor del estado inicial

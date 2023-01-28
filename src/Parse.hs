@@ -10,16 +10,15 @@ Stability   : experimental
 
 module Parse (tm, Parse.parse, decl, runP, P, program, declOrTm) where
 
-import Prelude hiding ( const )
-import Lang
-import Common
-import Text.Parsec hiding (runP,parse)
-import Data.Char ( isNumber, ord )
-import qualified Text.Parsec.Token as Tok
-import Text.ParserCombinators.Parsec.Language --( GenLanguageDef(..), emptyDef )
-import qualified Text.Parsec.Expr as Ex
-import Text.Parsec.Expr (Operator, Assoc)
-import Control.Monad.Identity (Identity)
+import           Common
+import           Control.Monad.Identity                 (Identity)
+import           Lang
+import           Prelude                                hiding (const)
+import           Text.Parsec                            hiding (parse, runP)
+import           Text.Parsec.Expr                       (Assoc, Operator)
+import qualified Text.Parsec.Expr                       as Ex
+import qualified Text.Parsec.Token                      as Tok
+import           Text.ParserCombinators.Parsec.Language
 
 type P = Parsec String ()
 
@@ -31,15 +30,14 @@ lexer :: Tok.TokenParser u
 lexer = Tok.makeTokenParser $
         emptyDef {
          commentLine    = "#",
-         reservedNames = ["let", "fun", "fix", "then", "else","in", 
-                           "ifz", "print","Nat"],
+         reservedNames = ["let", "fun", "fix", "then", "else", "in", "ifz", "print", "Nat"],
          reservedOpNames = ["->",":","=","+","-"]
         }
 
 whiteSpace :: P ()
 whiteSpace = Tok.whiteSpace lexer
 
-natural :: P Integer 
+natural :: P Integer
 natural = Tok.natural lexer
 
 stringLiteral :: P String
@@ -65,7 +63,7 @@ num :: P Int
 num = fromInteger <$> natural
 
 var :: P Name
-var = identifier 
+var = identifier
 
 getPos :: P Pos
 getPos = do pos <- getPosition
@@ -76,13 +74,13 @@ tyatom = (reserved "Nat" >> return NatTy)
          <|> parens typeP
 
 typeP :: P Ty
-typeP = try (do 
+typeP = try (do
           x <- tyatom
           reservedOp "->"
           y <- typeP
           return (FunTy x y))
       <|> tyatom
-          
+
 const :: P Const
 const = CNat <$> num
 
@@ -156,7 +154,7 @@ letexp = do
   i <- getPos
   reserved "let"
   (v,ty) <- parens binding
-  reservedOp "="  
+  reservedOp "="
   def <- expr
   reserved "in"
   body <- expr
@@ -168,7 +166,7 @@ tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
 
 -- | Parser de declaraciones
 decl :: P (Decl NTerm)
-decl = do 
+decl = do
      i <- getPos
      reserved "let"
      v <- var
@@ -176,7 +174,7 @@ decl = do
      t <- expr
      return (Decl i v t)
 
--- | Parser de programas (listas de declaraciones) 
+-- | Parser de programas (listas de declaraciones)
 program :: P [Decl NTerm]
 program = many decl
 
@@ -193,4 +191,4 @@ runP p s filename = runParser (whiteSpace *> p <* eof) () filename s
 parse :: String -> NTerm
 parse s = case runP expr s "" of
             Right t -> t
-            Left e -> error ("no parse: " ++ show s)
+            Left e  -> error ("no parse: " ++ show s)

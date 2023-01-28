@@ -11,24 +11,24 @@ Este módulo evaluá términos siguiendo la semántica big-step (estrategia CBV)
 
 module Eval where
 
-import Common ( abort )
-import Lang
-import Subst ( substN, subst )
-import MonadFD4 ( MonadFD4, lookupDecl, failFD4, printFD4 )
-import PPrint ( ppName )
+import           Common   (abort)
+import           Lang
+import           MonadFD4 (MonadFD4, failFD4, lookupDecl, printFD4)
+import           PPrint   (ppName)
+import           Subst    (subst, substN)
 
 -- | Semántica de operadores binarios
 semOp :: BinaryOp -> Int -> Int -> Int
-semOp Add x y=  x + y
+semOp Add x y=x + y
 semOp Sub x y = max 0 (x - y)
 
 -- | Evaluador de términos CBV
 eval ::  MonadFD4 m => Term -> m Term
 eval (V _ (Global nm)) = do
   -- unfold and keep going
-  mtm <- lookupDecl nm 
-  case mtm of 
-    Nothing -> failFD4 $ "Error de ejecución: variable no declarada: " ++ ppName nm 
+  mtm <- lookupDecl nm
+  case mtm of
+    Nothing -> failFD4 $ "Error de ejecución: variable no declarada: " ++ ppName nm
     Just t -> eval t
 
 eval (App p l r) = do
@@ -47,7 +47,7 @@ eval (Print p str t) = do
           Const _ (CNat n) -> do printFD4 (str++show n)
                                  return te
           _                -> abort "Error de tipo en runtime!"
-eval (BinaryOp p op t u) = do 
+eval (BinaryOp p op t u) = do
         te <- eval t
         ue <- eval u
         case (te,ue) of
@@ -58,7 +58,7 @@ eval (IfZ p c t e) = do
      case ce of
        Const _ (CNat 0) -> eval t
        Const _ (CNat _) -> eval e
-       c' -> abort ("Error de tipo en runtime!")
+       c'               -> abort ("Error de tipo en runtime!")
 eval (Let _ _ _ m n) = do
     v <- eval m
     eval (subst v n)

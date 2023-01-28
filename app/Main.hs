@@ -12,42 +12,43 @@ Stability   : experimental
 
 module Main where
 
-import System.Console.Haskeline ( defaultSettings, getInputLine, runInputT, InputT )
-import Control.Monad.Catch (MonadMask)
+import           Control.Monad.Catch      (MonadMask)
+import           System.Console.Haskeline (InputT, defaultSettings,
+                                           getInputLine, runInputT)
 
 --import Control.Monad
-import Control.Monad.Trans
-import Data.List (nub,  intersperse, isPrefixOf )
-import Data.Char ( isSpace )
-import Control.Exception ( catch , IOException )
-import System.IO ( hPrint, stderr, hPutStrLn )
+import           Control.Exception        (IOException, catch)
+import           Control.Monad.Trans
+import           Data.Char                (isSpace)
+import           Data.List                (intersperse, isPrefixOf, nub)
+import           System.IO                (hPrint, hPutStrLn, stderr)
 
-import System.Exit
+import           System.Exit
 --import System.Process ( system )
-import Options.Applicative
+import           Options.Applicative
 --import Data.Text.Lazy (unpack)
 
-import Global ( GlEnv(..) )
-import Errors
-import Lang
-import Parse ( P, tm, program, declOrTm, runP )
-import Elab ( elab )
-import Eval ( eval )
-import PPrint ( pp , ppTy, ppDecl )
-import MonadFD4
-import TypeChecker ( tc, tcDecl )
+import           Elab                     (elab)
+import           Errors
+import           Eval                     (eval)
+import           Global                   (GlEnv (..))
+import           Lang
+import           MonadFD4
+import           PPrint                   (pp, ppDecl, ppTy)
+import           Parse                    (P, declOrTm, program, runP, tm)
+import           TypeChecker              (tc, tcDecl)
 
 prompt :: String
 prompt = "FD4> "
 
-{- 
+{-
  Tipo para representar las banderas disponibles en línea de comando.
 -}
 data Mode =
     Interactive
   | Typecheck
 -- | InteractiveCEK
--- | Bytecompile 
+-- | Bytecompile
 -- | RunVM
 -- | CC
 -- | Canon
@@ -56,7 +57,7 @@ data Mode =
 
 -- | Parser de banderas
 parseMode :: Parser (Mode,Bool)
-parseMode = (,) <$> 
+parseMode = (,) <$>
       (flag' Typecheck ( long "typecheck" <> short 't' <> help "Chequear tipos e imprimir el término")
   -- <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
   -- <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
@@ -70,7 +71,7 @@ parseMode = (,) <$>
    <*> pure False
    -- reemplazar por la siguiente línea para habilitar opción
    -- <*> flag False True (long "optimize" <> short 'o' <> help "Optimizar código")
-  
+
 -- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar
 parseArgs :: Parser (Mode,Bool, [FilePath])
 parseArgs = (\(a,b) c -> (a,b,c)) <$> parseMode <*> many (argument str (metavar "FILES..."))
@@ -84,7 +85,7 @@ main = execParser opts >>= go
      <> header "Compilador de FD4 de la materia Compiladores 2021" )
 
     go :: (Mode,Bool,[FilePath]) -> IO ()
-    go (Interactive,_,files) = 
+    go (Interactive,_,files) =
               do runFD4 (runInputT defaultSettings (repl files))
                  return ()
     go (Typecheck,opt, files) =
@@ -97,7 +98,7 @@ main = execParser opts >>= go
     -- go (CC,_, files) =
     --           runOrFail $ mapM_ ccFile files
     -- go (Canon,_, files) =
-    --           runOrFail $ mapM_ canonFile files 
+    --           runOrFail $ mapM_ canonFile files
     -- go (LLVM,_, files) =
     --           runOrFail $ mapM_ llvmFile files
     -- go (Build,_, files) =
@@ -261,7 +262,7 @@ compilePhrase ::  MonadFD4 m => String -> m ()
 compilePhrase x =
   do
     dot <- parseIO "<interactive>" declOrTm x
-    case dot of 
+    case dot of
       Left d  -> handleDecl d
       Right t -> handleTerm t
 
@@ -279,9 +280,9 @@ printPhrase x =
   do
     x' <- parseIO "<interactive>" tm x
     let ex = elab x'
-    t  <- case x' of 
+    t  <- case x' of
            (V p f) -> maybe ex id <$> lookupDecl f
-           _       -> return ex  
+           _       -> return ex
     printFD4 "NTerm:"
     printFD4 (show x')
     printFD4 "\nTerm:"
