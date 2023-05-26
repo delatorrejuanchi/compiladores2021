@@ -7,16 +7,16 @@ Maintainer  : mauro@fceia.unr.edu.ar
 Stability   : experimental
 
 Este módulo permite elaborar términos y declaraciones para convertirlas desde
-fully named (@NTerm) a locally closed (@Term@) 
+fully named (@NTerm) a locally closed (@Term@)
 -}
 
 module Elab ( elab, elab_decl ) where
 
-import Lang
-import Subst
+import           Lang
+import           Subst
 
 -- | 'elab' transforma variables ligadas en índices de de Bruijn
--- en un término dado. 
+-- en un término dado.
 elab :: NTerm -> Term
 elab = elab' []
 
@@ -24,7 +24,7 @@ elab' :: [Name] -> NTerm -> Term
 elab' env (V p v) =
   -- Tenemos que hver si la variable es Global o es un nombre local
   -- En env llevamos la lista de nombres locales.
-  if v `elem` env 
+  if v `elem` env
     then  V p (Free v)
     else V p (Global v)
 

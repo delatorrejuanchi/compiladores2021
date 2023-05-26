@@ -1,9 +1,9 @@
 module Build where
 
 -- | Build Test Suite
-import Spec
+import           Spec
 
 main :: IO ()
-main = 
+main =
   putStrLn "Test result generation" >>
   runTestWith "test/generate_result.sh "

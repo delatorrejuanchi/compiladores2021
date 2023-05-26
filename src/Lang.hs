@@ -18,8 +18,8 @@ Definiciones de distintos tipos de datos:
 
 module Lang where
 
-import           Common                         ( Pos )
-import           Data.List.Extra                ( nubSort )
+import           Common          (Pos)
+import           Data.List.Extra (nubSort)
 
 -- | AST de Tipos
 data Ty =
@@ -43,10 +43,10 @@ data Decl a = Decl
   }
   deriving (Show, Functor)
 
--- | AST de los términos. 
---   - info es información extra que puede llevar cada nodo. 
+-- | AST de los términos.
+--   - info es información extra que puede llevar cada nodo.
 --       Por ahora solo la usamos para guardar posiciones en el código fuente.
---   - var es el tipo de la variables. Es 'Name' para fully named y 'Var' para locally closed. 
+--   - var es el tipo de la variables. Es 'Name' para fully named y 'Var' para locally closed.
 data Tm info var =
     V info var
   | Const info Const

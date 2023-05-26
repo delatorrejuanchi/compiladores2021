@@ -1,13 +1,13 @@
 module IR where
 
-import Lang
+import           Lang
 
 data Ir = IrVar Name
         | IrGlobal Name
         | IrCall Ir [Ir]
         | IrConst Const
         | IrPrint String Ir
-        | IrBinaryOp BinaryOp Ir Ir 
+        | IrBinaryOp BinaryOp Ir Ir
         | IrLet Name Ir Ir
         | IrIfZ Ir Ir Ir
         | MkClosure Name [Ir]
@@ -15,12 +15,12 @@ data Ir = IrVar Name
   deriving Show
 
 data IrDecl =
-    IrFun { irDeclName :: Name
+    IrFun { irDeclName     :: Name
           , irDeclArgNames :: [Name]
-          , irDeclBody :: Ir
+          , irDeclBody     :: Ir
     }
   | IrVal { irDeclName :: Name
-          , irDeclDef :: Ir
+          , irDeclDef  :: Ir
           }
   deriving Show
 

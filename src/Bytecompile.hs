@@ -7,20 +7,21 @@ License     : GPL-3
 Maintainer  : mauro@fceia.unr.edu.ar
 Stability   : experimental
 
-Este módulo permite compilar módulos a la BVM. También provee una implementación de la BVM 
+Este módulo permite compilar módulos a la BVM. También provee una implementación de la BVM
 para ejecutar bytecode.
 -}
 module Bytecompile
   (Bytecode, runBC, bcWrite, bcRead,bytecompileModule)
  where
 
-import Lang 
-import MonadFD4
+import           Lang
+import           MonadFD4
 
+import           Data.Binary          (Binary (get, put), Word32, decode,
+                                       encode)
+import           Data.Binary.Get      (getWord32le, isEmpty)
+import           Data.Binary.Put      (putWord32le)
 import qualified Data.ByteString.Lazy as BS
-import Data.Binary ( Word32, Binary(put, get), decode, encode )
-import Data.Binary.Put ( putWord32le )
-import Data.Binary.Get ( getWord32le, isEmpty )
 
 type Opcode = Int
 type Bytecode = [Int]
@@ -30,8 +31,8 @@ newtype Bytecode32 = BC { un32 :: [Word32] }
 {- Esta instancia explica como codificar y decodificar Bytecode de 32 bits -}
 instance Binary Bytecode32 where
   put (BC bs) = mapM_ putWord32le bs
-  get = go 
-    where go =  
+  get = go
+    where go =
            do
             empty <- isEmpty
             if empty
@@ -43,7 +44,7 @@ instance Binary Bytecode32 where
 {- Estos sinónimos de patrón nos permiten escribir y hacer
 pattern-matching sobre el nombre de la operación en lugar del código
 entero, por ejemplo:
- 
+
    f (CALL : cs) = ...
 
  Notar que si hubieramos escrito algo como
@@ -77,7 +78,7 @@ type Module = [Decl Term]
 bytecompileModule :: MonadFD4 m => Module -> m Bytecode
 bytecompileModule = error "implementame"
 
--- | Toma un bytecode, lo codifica y lo escribe un archivo 
+-- | Toma un bytecode, lo codifica y lo escribe un archivo
 bcWrite :: Bytecode -> FilePath -> IO ()
 bcWrite bs filename = BS.writeFile filename (encode $ BC $ fromIntegral <$> bs)
 

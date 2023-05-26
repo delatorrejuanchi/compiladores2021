@@ -1,6 +1,6 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 {-|
 Module      : MonadFD4
@@ -33,14 +33,14 @@ module MonadFD4 (
   module Control.Monad.State)
  where
 
-import Common
-import Lang
-import Global
-import Errors ( Error(..) )
-import Control.Monad.State
-import Control.Monad.Except
-import System.IO
-import Data.List (deleteFirstsBy)
+import           Common
+import           Control.Monad.Except
+import           Control.Monad.State
+import           Data.List            (deleteFirstsBy)
+import           Errors               (Error (..))
+import           Global
+import           Lang
+import           System.IO
 
 -- * La clase 'MonadFD4m'
 
@@ -70,12 +70,12 @@ getLastFile = gets lfile
 
 addDecl :: MonadFD4 m => Decl Term -> m ()
 addDecl d = modify (\s -> s { glb = d : glb s, cantDecl = cantDecl s + 1 })
-  
+
 addTy :: MonadFD4 m => Name -> Ty -> m ()
 addTy n ty = modify (\s -> s { tyEnv = (n,ty) : tyEnv s })
 
 eraseLastFileDecls :: MonadFD4 m => m ()
-eraseLastFileDecls = do 
+eraseLastFileDecls = do
       s <- get
       let n = cantDecl s
           (era,rem) = splitAt n (glb s)
@@ -90,7 +90,7 @@ lookupDecl nm = do
      s <- get
      case filter (hasName nm) (glb s) of
        (Decl { declBody=e }):_ -> return (Just e)
-       [] -> return Nothing
+       []                      -> return Nothing
 
 lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)
 lookupTy nm = do
@@ -104,8 +104,8 @@ failFD4 :: MonadFD4 m => String -> m a
 failFD4 = failPosFD4 NoPos
 
 catchErrors  :: MonadFD4 m => m a -> m (Maybe a)
-catchErrors c = catchError (Just <$> c) 
-                           (\e -> liftIO $ hPutStrLn stderr (show e) 
+catchErrors c = catchError (Just <$> c)
+                           (\e -> liftIO $ hPutStrLn stderr (show e)
                               >> return Nothing)
 
 ----
@@ -121,7 +121,7 @@ type FD4 = StateT GlEnv (ExceptT Error IO)
 -- | Esta es una instancia vacía, ya que 'MonadFD4' no tiene funciones miembro.
 instance MonadFD4 FD4
 
--- 'runFD4\'' corre una computación de la mónad 'FD4' en el estado inicial 'Global.initialEnv' 
+-- 'runFD4\'' corre una computación de la mónad 'FD4' en el estado inicial 'Global.initialEnv'
 runFD4' :: FD4 a -> IO (Either Error (a, GlEnv))
 runFD4' c =  runExceptT $ runStateT c initialEnv
 

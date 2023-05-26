@@ -1,9 +1,9 @@
 module Byte where
 
 -- | Bytecode Test Suite
-import Spec
+import           Spec
 
 main :: IO ()
-main = 
+main =
   putStrLn "Byte Test Suite" >>
   runTestWith "test/byte_run.sh "

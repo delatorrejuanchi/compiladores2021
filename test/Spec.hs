@@ -5,13 +5,13 @@
 
 module Spec where
 
-import Test.Framework
-import Test.Framework.BlackBoxTest
+import           Test.Framework
+import           Test.Framework.BlackBoxTest
 
 runTestWith :: String -> IO ()
 runTestWith script = do
   bbts <- blackBoxTests "test/correctos" script ".fd4" bbTArg
-  htfMain ([makeTestSuite "bbts" bbts])
+  htfMain [makeTestSuite "bbts" bbts]
   where
     bbTArg = defaultBBTArgs
       { bbtArgs_stdoutSuffix = ".fd4.out"
