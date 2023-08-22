@@ -14,7 +14,8 @@ import           Control.Monad.Identity                 (Identity)
 import           Data.Char                              (isNumber, ord)
 import           Lang
 import           Prelude                                hiding (const)
-import           Text.Parsec                            hiding (parse, runP)
+import           Text.Parsec                            hiding (oneOf, parse,
+                                                         runP)
 import           Text.Parsec.Expr                       (Assoc, Operator)
 import qualified Text.Parsec.Expr                       as Ex
 import qualified Text.Parsec.Token                      as Tok
@@ -34,6 +35,7 @@ lexer =
       { commentLine = "#",
         reservedNames =
           [ "let",
+            "rec",
             "fun",
             "fix",
             "then",
@@ -41,7 +43,8 @@ lexer =
             "in",
             "ifz",
             "print",
-            "Nat"
+            "Nat",
+            "type"
           ],
         reservedOpNames = ["->", ":", "=", "+", "-"]
       }
@@ -67,6 +70,9 @@ reserved = Tok.reserved lexer
 reservedOp :: String -> P ()
 reservedOp = Tok.reservedOp lexer
 
+oneOf :: [P a] -> P a
+oneOf = choice . map try
+
 -----------------------
 -- Parsers
 -----------------------
@@ -82,81 +88,66 @@ getPos = do
   pos <- getPosition
   return $ Pos (sourceLine pos) (sourceColumn pos)
 
-tyatom :: P Ty
+tyatom :: P STy
 tyatom =
-  (reserved "Nat" >> return NatTy)
+  (reserved "Nat" >> return SNatTy)
     <|> parens typeP
 
-typeP :: P Ty
-typeP =
-  try
-    ( do
-        x <- tyatom
-        reservedOp "->"
-        y <- typeP
-        return (FunTy x y)
-    )
-    <|> tyatom
+typeP :: P STy
+typeP = oneOf [SFunTy <$> tyatom <*> (reservedOp "->" >> typeP), tyatom]
 
 const :: P Const
 const = CNat <$> num
 
-printOp :: P NTerm
+-- todo: eta-expansion
+printOp :: P SNTerm
 printOp = do
   i <- getPos
   reserved "print"
   str <- option "" stringLiteral
-  a <- atom
-  return (Print i str a)
+  SPrint i str <$> atom
 
-binary :: String -> BinaryOp -> Assoc -> Operator String () Identity NTerm
-binary s f = Ex.Infix (reservedOp s >> return (BinaryOp NoPos f))
+binary :: String -> BinaryOp -> Assoc -> Operator String () Identity SNTerm
+binary s f = Ex.Infix (reservedOp s >> return (SBinaryOp NoPos f))
 
-table :: [[Operator String () Identity NTerm]]
+table :: [[Operator String () Identity SNTerm]]
 table =
   [ [ binary "+" Add Ex.AssocLeft,
       binary "-" Sub Ex.AssocLeft
     ]
   ]
 
-expr :: P NTerm
+expr :: P SNTerm
 expr = Ex.buildExpressionParser table tm
 
-atom :: P NTerm
-atom =
-  (flip Const <$> const <*> getPos)
-    <|> flip V <$> var <*> getPos
-    <|> parens expr
-    <|> printOp
+atom :: P SNTerm
+atom = oneOf [SConst <$> getPos <*> const, SV <$> getPos <*> var, parens expr, printOp]
 
 -- parsea un par (variable : tipo)
-binding :: P (Name, Ty)
+binding :: P (Name, STy)
 binding = do
   v <- var
   reservedOp ":"
   ty <- typeP
   return (v, ty)
 
-lam :: P NTerm
+lam :: P SNTerm
 lam = do
   i <- getPos
   reserved "fun"
-  (v, ty) <- parens binding
+  bs <- many1 $ parens binding
   reservedOp "->"
-  t <- expr
-  return (Lam i v ty t)
+  SLam i bs <$> expr
 
 -- Nota el parser app también parsea un solo atom.
-app :: P NTerm
-app =
-  ( do
-      i <- getPos
-      f <- atom
-      args <- many atom
-      return (foldl (App i) f args)
-  )
+app :: P SNTerm
+app = do
+  i <- getPos
+  f <- atom
+  args <- many atom
+  return (foldl (SApp i) f args)
 
-ifz :: P NTerm
+ifz :: P SNTerm
 ifz = do
   i <- getPos
   reserved "ifz"
@@ -164,59 +155,123 @@ ifz = do
   reserved "then"
   t <- expr
   reserved "else"
-  e <- expr
-  return (IfZ i c t e)
+  SIfZ i c t <$> expr
 
-fix :: P NTerm
+fix :: P SNTerm
 fix = do
   i <- getPos
   reserved "fix"
   (f, fty) <- parens binding
   (x, xty) <- parens binding
   reservedOp "->"
-  t <- expr
-  return (Fix i f fty x xty t)
+  SFix i f fty x xty <$> expr
 
-letexp :: P NTerm
-letexp = do
+letexp :: P SNTerm
+letexp = oneOf [letvar, letfun, letrecfun]
+
+letvar :: P SNTerm
+letvar = do
   i <- getPos
   reserved "let"
-  (v, ty) <- parens binding
-  reservedOp "="
-  def <- expr
-  reserved "in"
+  (name, ty) <- parens binding <|> binding
+  reserved "="
   body <- expr
-  return (Let i v ty def body)
+  reserved "in"
+  SLet i name ty body <$> expr
+
+-- TODO: we should build the rec function closure here
+letfun :: P SNTerm
+letfun = do
+  i <- getPos
+  reserved "let"
+  name <- var
+  bs <- many1 $ parens binding
+  reservedOp "="
+  body <- expr
+  reserved "in"
+  let ty = foldr (SFunTy . snd) (snd $ last bs) bs
+  let f = SLam i bs body
+  SLet i name ty f <$> expr
+
+letrecfun :: P SNTerm
+letrecfun = do
+  i <- getPos
+  reserved "let"
+  reserved "rec"
+  name <- var
+  bs <- many1 $ parens binding
+  reservedOp "="
+  body <- expr
+  reserved "in"
+  let (bname1, bty1) = head bs
+  let ty = foldr (SFunTy . snd) (snd $ last bs) bs
+  let f = SFix i name ty bname1 bty1 (SLam i bs body)
+  SLet i name ty f <$> expr
 
 -- | Parser de términos
-tm :: P NTerm
-tm = app <|> lam <|> ifz <|> printOp <|> fix <|> letexp
+tm :: P SNTerm
+tm = oneOf [app, lam, ifz, printOp, fix, letexp]
 
 -- | Parser de declaraciones
-decl :: P (Decl NTerm)
-decl = do
+decl :: P SNTermDecl
+decl = oneOf [declfun, declrecfun, declvar, decltype]
+
+declvar :: P SNTermDecl
+declvar = do
   i <- getPos
   reserved "let"
-  v <- var
+  (name, ty) <- parens binding <|> binding
+  reserved "="
+  Decl i name ty <$> expr
+
+declfun :: P SNTermDecl
+declfun = do
+  i <- getPos
+  reserved "let"
+  name <- var
+  bs <- many1 $ parens binding
   reservedOp "="
-  t <- expr
-  return (Decl i v t)
+  let ty = foldr (SFunTy . snd) (snd $ last bs) bs
+  Decl i name ty . SLam i bs <$> expr
+
+declrecfun :: P SNTermDecl
+declrecfun = do
+  i <- getPos
+  reserved "let"
+  reserved "rec"
+  name <- var
+  bs <- many1 $ parens binding
+  reservedOp "="
+  let (bname1, bty1) = head bs
+  let ty = foldr (SFunTy . snd) (snd $ last bs) bs
+  Decl i name ty . SFix i name ty bname1 bty1 . SLam i bs <$> expr
+
+-- todo: implement
+decltype :: P SNTermDecl
+decltype = do
+  i <- getPos
+  reserved "let"
+  reserved "type"
+  name <- var
+  reserved "="
+  -- DeclType i name <$> typeP
+  undefined
 
 -- | Parser de programas (listas de declaraciones)
-program :: P [Decl NTerm]
+program :: P [SNTermDecl]
 program = many decl
 
 -- | Parsea una declaración a un término
 -- Útil para las sesiones interactivas
-declOrTm :: P (Either (Decl NTerm) NTerm)
-declOrTm = try (Left <$> decl) <|> (Right <$> expr)
+declOrTm :: P (Either SNTermDecl SNTerm)
+declOrTm = oneOf [Left <$> decl, Right <$> expr]
 
 -- Corre un parser, chequeando que se pueda consumir toda la entrada
 runP :: P a -> String -> String -> Either ParseError a
 runP p s filename = runParser (whiteSpace *> p <* eof) () filename s
 
 --para debugging en uso interactivo (ghci)
-parse :: String -> NTerm
+parse :: String -> SNTerm
 parse s = case runP expr s "" of
   Right t -> t
   Left e  -> error ("no parse: " ++ show s)
