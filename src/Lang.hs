@@ -25,6 +25,13 @@ data Ty
   deriving (Show, Eq)
 type Name = String
 
+-- | AST superficial de Tipos
+data STy
+  = SNatTy
+  | SFunTy STy STy
+  | STySyn Name
+  deriving (Show, Eq)
+
 data Const = CNat Int
   deriving (Show)
 
@@ -54,6 +61,23 @@ data Tm info var
   | IfZ info (Tm info var) (Tm info var) (Tm info var)
   | Let info Name Ty (Tm info var) (Tm info var)
   deriving (Show, Functor)
+
+-- | AST superficial de los términos.
+data STm info var
+  = SV info var
+  | SConst info Const
+  | SLam info [(Name, STy)] (STm info var)
+  | SApp info (STm info var) (STm info var)
+  | SPrint info String (STm info var)
+  | SPrintEta info String
+  | SBinaryOp info BinaryOp (STm info var) (STm info var)
+  | SFix info Name STy Name STy (STm info var)
+  | -- | SFix info Name STy [(Name, STy)] (STm info var) multibinders
+    SIfZ info (STm info var) (STm info var) (STm info var)
+  | SLet info Bool Name STy (STm info var) (STm info var)
+  deriving (Show, Functor)
+
+type SNTerm = STm Pos Name
 
 type NTerm =
   -- | 'Tm' tiene 'Name's como variables ligadas y libres y globales, guarda posición
