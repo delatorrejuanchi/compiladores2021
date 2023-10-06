@@ -2,10 +2,10 @@
 
 module Batch where
 
-import Spec
+import           Spec
 
 main :: IO ()
-main = 
+main =
   putStrLn "Batch execution test suite" >>
   putStrLn "========================================" >>
   runTestWith "test/batch_run.sh "

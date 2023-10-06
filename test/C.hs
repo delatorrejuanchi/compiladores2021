@@ -2,7 +2,7 @@
 
 module C where
 
-import Spec
+import           Spec
 
 main :: IO ()
 main =

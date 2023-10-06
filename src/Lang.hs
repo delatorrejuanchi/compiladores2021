@@ -19,10 +19,18 @@ import           Common          (Pos)
 import           Data.List.Extra (nubSort)
 
 -- | AST de Tipos
-data Ty
-  = NatTy
-  | FunTy Ty Ty
+data Ty =
+      NatTy
+    | FunTy Ty Ty
+    deriving (Show,Eq)
+
+-- | AST de Tipos azucarado.
+data STy =
+    SNatTy
+  | SFunTy STy STy
+  | STySyn Name
   deriving (Show, Eq)
+
 type Name = String
 
 -- | AST superficial de Tipos
@@ -39,19 +47,20 @@ data BinaryOp = Add | Sub
   deriving (Show)
 
 -- | tipo de datos de declaraciones, parametrizado por el tipo del cuerpo de la declaración
-data Decl a = Decl
-  { declPos  :: Pos,
-    declName :: Name,
-    declBody :: a
-  }
+data Decl a b =
+    Decl { declPos :: Pos, declName :: Name, declTy :: a, declBody :: b }
+  | DeclTy { declPos :: Pos, declName :: Name, declTy :: a }
   deriving (Show, Functor)
+
+type TermDecl = Decl Ty Term
+type SNTermDecl = Decl STy SNTerm
 
 -- | AST de los términos.
 --   - info es información extra que puede llevar cada nodo.
 --       Por ahora solo la usamos para guardar posiciones en el código fuente.
 --   - var es el tipo de la variables. Es 'Name' para fully named y 'Var' para locally closed.
-data Tm info var
-  = V info var
+data Tm info var =
+    V info var
   | Const info Const
   | Lam info Name Ty (Tm info var)
   | App info (Tm info var) (Tm info var)
@@ -77,18 +86,26 @@ data STm info var
   | SLet info Bool Name STy (STm info var) (STm info var)
   deriving (Show, Functor)
 
+-- | AST superficial.
+-- todo: multibinders (should be as simple as changing [(Name, STy)]) to [([Name], STy)]
+-- todo: should let have multiple declarations? not included in pdf
+-- todo: parens in parser
+data STm info var =
+    SV info var
+  | SConst info Const
+  | SLam info [(Name, STy)] (STm info var)
+  | SApp info (STm info var) (STm info var)
+  | SPrint info String (STm info var)
+  | SBinaryOp info BinaryOp (STm info var) (STm info var)
+  | SFix info Name STy Name STy (STm info var) -- | SFix info Name STy [(Name, STy)] (STm info var) multibinders
+  | SIfZ info (STm info var) (STm info var) (STm info var)
+  | SLet info Name STy (STm info var) (STm info var)
+  deriving (Show, Functor)
+
 type SNTerm = STm Pos Name
 
-type NTerm =
-  -- | 'Tm' tiene 'Name's como variables ligadas y libres y globales, guarda posición
-  Tm Pos Name
-
-type Term =
-  -- | 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición
-  Tm Pos Var
-
-data Var
-  = Bound !Int
+data Var =
+    Bound !Int
   | Free Name
   | Global Name
   deriving (Show)

@@ -1,5 +1,7 @@
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE TupleSections        #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 {-|
 Module      : MonadFD4
@@ -67,7 +69,7 @@ setLastFile filename = modify (\s -> s {lfile = filename})
 getLastFile :: MonadFD4 m => m FilePath
 getLastFile = gets lfile
 
-addDecl :: MonadFD4 m => Decl Term -> m ()
+addDecl :: MonadFD4 m => TermDecl -> m ()
 addDecl d = modify (\s -> s { glb = d : glb s, cantDecl = cantDecl s + 1 })
 
 addTy :: MonadFD4 m => Name -> Ty -> m ()
@@ -77,24 +79,25 @@ eraseLastFileDecls :: MonadFD4 m => m ()
 eraseLastFileDecls = do
       s <- get
       let n = cantDecl s
-          (era,rem) = splitAt n (glb s)
-          tyEnv' = deleteTy (map declName era) (tyEnv s)
-      modify (\s -> s {glb = rem, cantDecl = 0, tyEnv = tyEnv'})
-   where deleteTy xs ps = deleteFirstsBy (\x y -> fst x == fst y) ps (map (flip (,) NatTy) xs)
-hasName :: Name -> Decl a -> Bool
-hasName nm (Decl { declName = nm' }) = nm == nm'
+          (era, r) = splitAt n (glb s)
+          tyEnv' = deleteTy (map declName era) (tyEnv s) -- todo: bug?
+      modify (\s -> s {glb = r, cantDecl = 0, tyEnv = tyEnv'})
+   where deleteTy xs ps = deleteFirstsBy (\x y -> fst x == fst y) ps (map (, NatTy) xs)
+
+hasName :: Name -> Decl a b -> Bool
+hasName nm Decl { declName = nm' } = nm == nm'
+hasName nm (DeclTy _ nm' _)        = nm == nm'
 
 lookupDecl :: MonadFD4 m => Name -> m (Maybe Term)
 lookupDecl nm = do
      s <- get
      case filter (hasName nm) (glb s) of
-       (Decl { declBody=e }):_ -> return (Just e)
-       []                      -> return Nothing
+       Decl { declBody=e }:_ -> return (Just e)
+       DeclTy {}:_           -> return Nothing
+       []                    -> return Nothing
 
 lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)
-lookupTy nm = do
-      s <- get
-      return $ lookup nm (tyEnv s)
+lookupTy nm = gets (lookup nm . tyEnv)
 
 failPosFD4 :: MonadFD4 m => Pos -> String -> m a
 failPosFD4 p s = throwError (ErrPos p s)
@@ -104,8 +107,7 @@ failFD4 = failPosFD4 NoPos
 
 catchErrors  :: MonadFD4 m => m a -> m (Maybe a)
 catchErrors c = catchError (Just <$> c)
-                           (\e -> liftIO $ hPutStrLn stderr (show e)
-                              >> return Nothing)
+                           (\e -> liftIO $ hPrint stderr e >> return Nothing)
 
 ----
 -- Importante, no eta-expandir porque GHC no hace una

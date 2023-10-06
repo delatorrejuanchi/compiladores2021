@@ -71,8 +71,8 @@ tc (BinaryOp p op t u) bs = do
          expect NatTy uty u
 
 -- | @'typeError' t s@ lanza un error de tipo para el término @t@
-typeError :: MonadFD4 m => Term   -- término que se está chequeando
-                        -> String -- mensaje de error
+typeError :: MonadFD4 m => Term   -- ^ término que se está chequeando
+                        -> String -- ^ mensaje de error
                         -> m a
 typeError t s = do
    ppt <- pp t

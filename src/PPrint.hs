@@ -37,8 +37,8 @@ freshen ns n = let cands = n : (map (\i -> n ++ show i) [0..])
 -- Estos nombres se encuentran en la lista ns (primer argumento).
 openAll :: [Name] -> Term -> NTerm
 openAll ns (V p v) = case v of
-      Bound i  ->  V p $ "(Bound "++show i++")" --este caso no debería aparecer
-                                               --si el término es localmente cerrado
+      Bound i  -> V p $ "(Bound "++show i++")" -- este caso no debería aparecer
+                                                -- si el término es localmente cerrado
       Free x   -> V p x
       Global x -> V p x
 openAll ns (Const p c) = Const p c
@@ -178,12 +178,32 @@ render :: Doc AnsiStyle -> String
 render = unpack . renderStrict . layoutSmart defaultLayoutOptions
 
 -- | Pretty printing de declaraciones
-ppDecl :: MonadFD4 m => Decl Term -> m String
-ppDecl (Decl p x t) = do
+ppDecl :: MonadFD4 m => Decl Term Ty -> m String
+ppDecl (Decl p x ty t) = do
   gdecl <- gets glb
   return (render $ sep [defColor (pretty "let")
                        , name2doc x
                        , defColor (pretty "=")]
-                   <+> nest 2 (t2doc False (openAll (map declName gdecl) t)))
+                   <+> nest 2 (t2doc False $ resugar (openAll (map declName gdecl) t)))
+ppDecl (DeclTy p x ty) = return (render $ sep [defColor (pretty "type"), name2doc x, defColor (pretty "="), ty2doc $ resugarType ty])
 
+resugarType :: Ty -> STy
+resugarType NatTy           = SNatTy
+resugarType (FunTy ty1 ty2) = SFunTy (resugarType ty1) (resugarType ty2)
 
+-- todo: should we add info to info so that we can resugar more closely to what the code looked like?
+resugar :: NTerm  -> SNTerm
+resugar (V info var) = SV info var
+resugar (Const info c) = SConst info c
+resugar (Lam info name ty term) = let (args, term') = buildSLam name (resugarType ty) term in SLam info args term'
+resugar (App info term1 term2) = SApp info (resugar term1) (resugar term2)
+resugar (Print info string term) = SPrint info string (resugar term)
+resugar (BinaryOp info op term1 term2) = SBinaryOp info op (resugar term1) (resugar term2)
+resugar (Fix info name1 ty1 name2 ty2 body) = SFix info name1 (resugarType ty1) name2 (resugarType ty2) (resugar body)
+resugar (IfZ info cond true false) = SIfZ info (resugar cond) (resugar true) (resugar false)
+resugar (Let info name ty term1 term2) = SLet info name (resugarType ty) (resugar term1) (resugar term2)
+
+buildSLam :: Name -> STy -> NTerm -> ([(Name, STy)], SNTerm)
+buildSLam name ty term = buildSLam' [(name, ty)] term
+    where buildSLam' args (Lam info name ty2 term) = buildSLam' ((name, resugarType ty2):args) term
+          buildSLam' args term = (reverse args, resugar term)
