@@ -29,13 +29,14 @@ import           System.Exit
 import           Options.Applicative
 --import Data.Text.Lazy (unpack)
 
-import           Elab                     (elab)
+--import Data.Text.Lazy (unpack)
+import           Elab                     (elab, desugarType)
 import           Errors
 import           Eval                     (eval)
 import           Global                   (GlEnv (..))
 import           Lang
 import           MonadFD4
-import           PPrint                   (pp, ppDecl, ppTy)
+import           PPrint                   (pp, ppDecl, ppTy, resugarType)
 import           Parse                    (P, declOrTm, program, runP, tm)
 import           TypeChecker              (tc, tcDecl)
 
@@ -139,7 +140,7 @@ compileFiles (x:xs) = do
         compileFile x
         compileFiles xs
 
-loadFile ::  MonadFD4 m => FilePath -> m [Decl SNTerm]
+loadFile ::  MonadFD4 m => FilePath -> m [SNTermDecl]
 loadFile f = do
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
@@ -172,17 +173,22 @@ parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
-typecheckDecl :: MonadFD4 m => Decl SNTerm -> m (Decl Term)
-typecheckDecl (Decl p x t) = do
-        let dd = Decl p x (elab t)
+typecheckDecl :: MonadFD4 m => SNTermDecl -> m TermDecl
+typecheckDecl (Decl p x sty t) = do
+        ty <- desugarType sty
+        dd <- Decl p x ty <$> elab t
         tcDecl dd
         return dd
+typecheckDecl (DeclTy p x sty) = undefined -- TODO: implement
 
-handleDecl ::  MonadFD4 m => Decl SNTerm -> m ()
+handleDecl ::  MonadFD4 m => SNTermDecl -> m ()
 handleDecl d = do
-        (Decl p x tt) <- typecheckDecl d
-        te <- eval tt
-        addDecl (Decl p x te)
+        t <- typecheckDecl d
+        case t of
+          Decl p x ty tt -> do
+            te <- eval tt
+            addDecl $ Decl p x ty te
+          DeclTy p x ty  -> undefined -- TODO: implement
 
 data Command = Compile CompileForm
              | PPrint String
@@ -269,18 +275,18 @@ compilePhrase x =
 
 handleTerm ::  MonadFD4 m => SNTerm -> m ()
 handleTerm t = do
-         let tt = elab t
+         tt <- elab t
          s <- get
          ty <- tc tt (tyEnv s)
          te <- eval tt
          ppte <- pp te
-         printFD4 (ppte ++ " : " ++ ppTy ty)
+         printFD4 (ppte ++ " : " ++ ppTy (resugarType ty))
 
 printPhrase   :: MonadFD4 m => String -> m ()
 printPhrase x =
   do
     x' <- parseIO "<interactive>" tm x
-    let ex = elab x'
+    ex <- elab x'
     t  <- case x' of
            (SV p f) -> fromMaybe ex <$> lookupDecl f
            _        -> return ex
@@ -292,7 +298,7 @@ printPhrase x =
 typeCheckPhrase :: MonadFD4 m => String -> m ()
 typeCheckPhrase x = do
          t <- parseIO "<interactive>" tm x
-         let tt = elab t
+         tt <- elab t
          s <- get
          ty <- tc tt (tyEnv s)
-         printFD4 (ppTy ty)
+         printFD4 (ppTy $ resugarType ty)

@@ -12,7 +12,8 @@ module PPrint (
     pp,
     ppTy,
     ppName,
-    ppDecl
+    ppDecl,
+    resugarType
     ) where
 
 import           Lang
@@ -83,13 +84,14 @@ ppName :: Name -> String
 ppName = id
 
 -- | Pretty printer para tipos (Doc)
-ty2doc :: Ty -> Doc AnsiStyle
-ty2doc NatTy     = typeColor (pretty "Nat")
-ty2doc (FunTy x@(FunTy _ _) y) = sep [parens (ty2doc x), typeOpColor (pretty "->"),ty2doc y]
-ty2doc (FunTy x y) = sep [ty2doc x, typeOpColor (pretty "->"),ty2doc y]
+ty2doc :: STy -> Doc AnsiStyle
+ty2doc SNatTy     = typeColor (pretty "Nat")
+ty2doc (SFunTy x@(SFunTy _ _) y) = sep [parens (ty2doc x), typeOpColor (pretty "->"),ty2doc y]
+ty2doc (SFunTy x y) = sep [ty2doc x, typeOpColor (pretty "->"),ty2doc y]
+ty2doc (STySyn n) = typeColor (pretty n)
 
 -- | Pretty printer para tipos (String)
-ppTy :: Ty -> String
+ppTy :: STy -> String
 ppTy = render . ty2doc
 
 c2doc :: Const -> Doc AnsiStyle
@@ -99,10 +101,11 @@ binary2doc :: BinaryOp -> Doc AnsiStyle
 binary2doc Add = opColor (pretty "+")
 binary2doc Sub = opColor (pretty "-")
 
-collectApp :: NTerm -> (NTerm, [NTerm])
-collectApp t = go [] t where
-  go ts (App _ h tt) = go (tt:ts) h
-  go ts h            = (h, ts)
+collectApp :: SNTerm -> (SNTerm, [SNTerm])
+collectApp = go []
+  where
+    go ts (SApp _ h tt) = go (tt:ts) h
+    go ts h            = (h, ts)
 
 parenIf :: Bool -> Doc a -> Doc a
 parenIf True = parens
@@ -112,25 +115,25 @@ parenIf _    = id
 -- at: debe ser un átomo
 -- | Pretty printing de términos (Doc)
 t2doc :: Bool     -- Debe ser un átomo?
-      -> NTerm    -- término a mostrar
+      -> SNTerm    -- término a mostrar
       -> Doc AnsiStyle
 -- Uncomment to use the Show instance for STerm
 {- t2doc at x = text (show x) -}
-t2doc at (V _ x) = name2doc x
-t2doc at (Const _ c) = c2doc c
-t2doc at (Lam _ v ty t) =
+t2doc at (SV _ x) = name2doc x
+t2doc at (SConst _ c) = c2doc c
+t2doc at (SLam _ args t) =
   parenIf at $
   sep [sep [ keywordColor (pretty "fun")
-           , binding2doc (v,ty)
+           , multibinding2doc args
            , opColor(pretty "->")]
       , nest 2 (t2doc False t)]
 
-t2doc at t@(App _ _ _) =
+t2doc at t@(SApp _ _ _) =
   let (h, ts) = collectApp t in
   parenIf at $
   t2doc True h <+> sep (map (t2doc True) ts)
 
-t2doc at (Fix _ f fty x xty m) =
+t2doc at (SFix _ f fty x xty m) =
   parenIf at $
   sep [ sep [keywordColor (pretty "fix")
                   , binding2doc (f, fty)
@@ -138,17 +141,17 @@ t2doc at (Fix _ f fty x xty m) =
                   , opColor (pretty "->") ]
       , nest 2 (t2doc False m)
       ]
-t2doc at (IfZ _ c t e) =
+t2doc at (SIfZ _ c t e) =
   parenIf at $
   sep [keywordColor (pretty "ifz"), nest 2 (t2doc False c)
      , keywordColor (pretty "then"), nest 2 (t2doc False t)
      , keywordColor (pretty "else"), nest 2 (t2doc False e) ]
 
-t2doc at (Print _ str t) =
+t2doc at (SPrint _ str t) =
   parenIf at $
   sep [keywordColor (pretty "print"), pretty (show str), t2doc True t]
 
-t2doc at (Let _ v ty t t') =
+t2doc at (SLet _ _ v ty t t') =
   parenIf at $
   sep [
     sep [keywordColor (pretty "let")
@@ -158,13 +161,16 @@ t2doc at (Let _ v ty t t') =
   , keywordColor (pretty "in")
   , nest 2 (t2doc False t') ]
 
-t2doc at (BinaryOp _ o a b) =
+t2doc at (SBinaryOp _ o a b) =
   parenIf at $
   t2doc True a <+> binary2doc o <+> t2doc True b
 
-binding2doc :: (Name, Ty) -> Doc AnsiStyle
+binding2doc :: (Name, STy) -> Doc AnsiStyle
 binding2doc (x, ty) =
   parens (sep [name2doc x, pretty ":", ty2doc ty])
+
+multibinding2doc :: [(Name, STy)] -> Doc AnsiStyle
+multibinding2doc args = sep (map binding2doc args)
 
 -- | Pretty printing de términos (String)
 pp :: MonadFD4 m => Term -> m String
@@ -172,13 +178,13 @@ pp :: MonadFD4 m => Term -> m String
 {- pp = show -}
 pp t = do
        gdecl <- gets glb
-       return (render . t2doc False $ openAll (map declName gdecl) t)
+       return (render . t2doc False $ resugar $ openAll (map declName gdecl) t)
 
 render :: Doc AnsiStyle -> String
 render = unpack . renderStrict . layoutSmart defaultLayoutOptions
 
 -- | Pretty printing de declaraciones
-ppDecl :: MonadFD4 m => Decl Term Ty -> m String
+ppDecl :: MonadFD4 m => Decl Ty Term-> m String
 ppDecl (Decl p x ty t) = do
   gdecl <- gets glb
   return (render $ sep [defColor (pretty "let")
@@ -201,7 +207,7 @@ resugar (Print info string term) = SPrint info string (resugar term)
 resugar (BinaryOp info op term1 term2) = SBinaryOp info op (resugar term1) (resugar term2)
 resugar (Fix info name1 ty1 name2 ty2 body) = SFix info name1 (resugarType ty1) name2 (resugarType ty2) (resugar body)
 resugar (IfZ info cond true false) = SIfZ info (resugar cond) (resugar true) (resugar false)
-resugar (Let info name ty term1 term2) = SLet info name (resugarType ty) (resugar term1) (resugar term2)
+resugar (Let info name ty term1 term2) = SLet info False name (resugarType ty) (resugar term1) (resugar term2)
 
 buildSLam :: Name -> STy -> NTerm -> ([(Name, STy)], SNTerm)
 buildSLam name ty term = buildSLam' [(name, ty)] term

@@ -24,13 +24,6 @@ data Ty =
     | FunTy Ty Ty
     deriving (Show,Eq)
 
--- | AST de Tipos azucarado.
-data STy =
-    SNatTy
-  | SFunTy STy STy
-  | STySyn Name
-  deriving (Show, Eq)
-
 type Name = String
 
 -- | AST superficial de Tipos
@@ -71,6 +64,9 @@ data Tm info var =
   | Let info Name Ty (Tm info var) (Tm info var)
   deriving (Show, Functor)
 
+type NTerm = Tm Pos Name   -- ^ 'Tm' tiene 'Name's como variables ligadas y libres y globales, guarda posición
+type Term = Tm Pos Var     -- ^ 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición
+
 -- | AST superficial de los términos.
 data STm info var
   = SV info var
@@ -78,11 +74,11 @@ data STm info var
   | SLam info [(Name, STy)] (STm info var)
   | SApp info (STm info var) (STm info var)
   | SPrint info String (STm info var)
-  | SPrintEta info String
+  -- | SPrintEta info String
   | SBinaryOp info BinaryOp (STm info var) (STm info var)
   | SFix info Name STy Name STy (STm info var)
-  | -- | SFix info Name STy [(Name, STy)] (STm info var) multibinders
-    SIfZ info (STm info var) (STm info var) (STm info var)
+  -- | SFix info Name STy [(Name, STy)] (STm info var) multibinders
+  | SIfZ info (STm info var) (STm info var) (STm info var)
   | SLet info Bool Name STy (STm info var) (STm info var)
   deriving (Show, Functor)
 
@@ -90,17 +86,17 @@ data STm info var
 -- todo: multibinders (should be as simple as changing [(Name, STy)]) to [([Name], STy)]
 -- todo: should let have multiple declarations? not included in pdf
 -- todo: parens in parser
-data STm info var =
-    SV info var
-  | SConst info Const
-  | SLam info [(Name, STy)] (STm info var)
-  | SApp info (STm info var) (STm info var)
-  | SPrint info String (STm info var)
-  | SBinaryOp info BinaryOp (STm info var) (STm info var)
-  | SFix info Name STy Name STy (STm info var) -- | SFix info Name STy [(Name, STy)] (STm info var) multibinders
-  | SIfZ info (STm info var) (STm info var) (STm info var)
-  | SLet info Name STy (STm info var) (STm info var)
-  deriving (Show, Functor)
+-- data STm info var =
+--     SV info var
+--   | SConst info Const
+--   | SLam info [(Name, STy)] (STm info var)
+--   | SApp info (STm info var) (STm info var)
+--   | SPrint info String (STm info var)
+--   | SBinaryOp info BinaryOp (STm info var) (STm info var)
+--   | SFix info Name STy Name STy (STm info var) -- | SFix info Name STy [(Name, STy)] (STm info var) multibinders
+--   | SIfZ info (STm info var) (STm info var) (STm info var)
+--   | SLet info Name STy (STm info var) (STm info var)
+--   deriving (Show, Functor)
 
 type SNTerm = STm Pos Name
 

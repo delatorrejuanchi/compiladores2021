@@ -97,13 +97,15 @@ domCod t ty = typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ 
 
 -- | 'tcDecl' chequea el tipo de una declaración
 -- y la agrega al entorno de tipado de declaraciones globales
-tcDecl :: MonadFD4 m  => Decl Term -> m ()
-tcDecl (Decl p n t) = do
+tcDecl :: MonadFD4 m  => TermDecl -> m ()
+tcDecl (Decl p n ty t) = do
     --chequear si el nombre ya está declarado
     mty <- lookupTy n
     case mty of
         Nothing -> do  --no está declarado
                   s <- get
-                  ty <- tc t (tyEnv s)
+                  ty' <- tc t (tyEnv s)
+                  -- check that ty == ty'
                   addTy n ty
         Just _  -> failPosFD4 p $ n ++" ya está declarado"
+tcDecl (DeclTy p n ty) = undefined

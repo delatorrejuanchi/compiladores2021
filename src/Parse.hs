@@ -177,7 +177,7 @@ letvar = do
   reserved "="
   body <- expr
   reserved "in"
-  SLet i name ty body <$> expr
+  SLet i False name ty body <$> expr
 
 -- TODO: we should build the rec function closure here
 letfun :: P SNTerm
@@ -191,7 +191,7 @@ letfun = do
   reserved "in"
   let ty = foldr (SFunTy . snd) (snd $ last bs) bs
   let f = SLam i bs body
-  SLet i name ty f <$> expr
+  SLet i False name ty f <$> expr
 
 letrecfun :: P SNTerm
 letrecfun = do
@@ -206,7 +206,7 @@ letrecfun = do
   let (bname1, bty1) = head bs
   let ty = foldr (SFunTy . snd) (snd $ last bs) bs
   let f = SFix i name ty bname1 bty1 (SLam i bs body)
-  SLet i name ty f <$> expr
+  SLet i True name ty f <$> expr
 
 -- | Parser de términos
 tm :: P SNTerm
