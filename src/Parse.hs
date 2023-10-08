@@ -169,10 +169,13 @@ fix = do
   return (SFix i f fty x xty t)
 
 letexp :: P SNTerm
-letexp = do
+letexp = oneOf [letvar]
+
+letvar :: P SNTerm
+letvar = do
   i <- getPos
   reserved "let"
-  (v, ty) <- parens binding
+  (v, ty) <- oneOf [parens binding, binding]
   reservedOp "="
   def <- expr
   reserved "in"
