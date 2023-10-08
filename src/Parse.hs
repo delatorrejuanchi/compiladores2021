@@ -94,7 +94,6 @@ tyatom =
 typeP :: P STy
 typeP = oneOf [SFunTy <$> tyatom <*> (reservedOp "->" >> typeP), tyatom]
 
-
 const :: P Const
 const = CNat <$> num
 
@@ -169,7 +168,7 @@ fix = do
   return (SFix i f fty x xty t)
 
 letexp :: P SNTerm
-letexp = oneOf [letvar]
+letexp = oneOf [letvar, letfun]
 
 letvar :: P SNTerm
 letvar = do
@@ -181,6 +180,20 @@ letvar = do
   reserved "in"
   body <- expr
   return (SLet i v ty def body)
+
+letfun :: P SNTerm
+letfun = do
+  i <- getPos
+  reserved "let"
+  f <- var
+  (x, xty) <- parens binding
+  reservedOp ":"
+  rty <- typeP
+  reservedOp "="
+  def <- expr
+  reserved "in"
+  body <- expr
+  return (SLet i f (SFunTy xty rty) (SLam i x xty def) body)
 
 -- | Parser de términos
 tm :: P SNTerm
