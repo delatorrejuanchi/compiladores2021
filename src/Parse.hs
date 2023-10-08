@@ -7,19 +7,20 @@
 -- Stability   : experimental
 module Parse (tm, Parse.parse, decl, runP, P, program, declOrTm) where
 
-import Common
+import           Common
 --( GenLanguageDef(..), emptyDef )
 
-import Control.Monad.Identity (Identity)
-import Control.Monad.RWS (MonadState (get))
-import Data.Char (isNumber, ord)
-import Lang
-import Text.Parsec hiding (oneOf, parse, runP)
-import Text.Parsec.Expr (Assoc, Operator)
-import qualified Text.Parsec.Expr as Ex
-import qualified Text.Parsec.Token as Tok
-import Text.ParserCombinators.Parsec.Language
-import Prelude hiding (const)
+import           Control.Monad.Identity                 (Identity)
+import           Control.Monad.RWS                      (MonadState (get))
+import           Data.Char                              (isNumber, ord)
+import           Lang
+import           Prelude                                hiding (const)
+import           Text.Parsec                            hiding (oneOf, parse,
+                                                         runP)
+import           Text.Parsec.Expr                       (Assoc, Operator)
+import qualified Text.Parsec.Expr                       as Ex
+import qualified Text.Parsec.Token                      as Tok
+import           Text.ParserCombinators.Parsec.Language
 
 oneOf :: [P a] -> P a
 oneOf = choice . map try
@@ -38,6 +39,7 @@ lexer =
       { commentLine = "#",
         reservedNames =
           [ "let",
+            "rec",
             "fun",
             "fix",
             "then",
@@ -133,10 +135,10 @@ lam :: P SNTerm
 lam = do
   i <- getPos
   reserved "fun"
-  (v, ty) <- parens binding
+  bs <- many1 $ parens binding
   reservedOp "->"
   t <- expr
-  return (SLam i v ty t)
+  return (SLam i bs t)
 
 -- Nota el parser app también parsea un solo atom.
 app :: P SNTerm
@@ -168,7 +170,7 @@ fix = do
   return (SFix i f fty x xty t)
 
 letexp :: P SNTerm
-letexp = oneOf [letvar, letfun]
+letexp = oneOf [letvar, letfun, letrec]
 
 letvar :: P SNTerm
 letvar = do
@@ -186,14 +188,29 @@ letfun = do
   i <- getPos
   reserved "let"
   f <- var
-  (x, xty) <- parens binding
+  bs <- many1 $ parens binding
   reservedOp ":"
   rty <- typeP
   reservedOp "="
   def <- expr
   reserved "in"
   body <- expr
-  return (SLet i f (SFunTy xty rty) (SLam i x xty def) body)
+  return (SLetFun i f bs rty def body)
+
+letrec :: P SNTerm
+letrec = do
+  i <- getPos
+  reserved "let"
+  reserved "rec"
+  f <- var
+  bs <- many1 $ parens binding
+  reservedOp ":"
+  rty <- typeP
+  reservedOp "="
+  def <- expr
+  reserved "in"
+  body <- expr
+  return (SLetRec i f bs rty def body)
 
 -- | Parser de términos
 tm :: P SNTerm
@@ -226,4 +243,4 @@ runP p s filename = runParser (whiteSpace *> p <* eof) () filename s
 parse :: String -> SNTerm
 parse s = case runP expr s "" of
   Right t -> t
-  Left e -> error ("no parse: " ++ show s)
+  Left e  -> error ("no parse: " ++ show s)

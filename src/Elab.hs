@@ -15,21 +15,29 @@ module Elab ( elab, elab_decl ) where
 import           Lang
 import           Subst
 
+buildFunTy :: [(Name, STy)] -> STy -> STy
+buildFunTy [] rty             = rty
+buildFunTy ((_, ty) : bs) rty = SFunTy ty (buildFunTy bs rty)
+
 desugar :: SNTerm -> NTerm
 desugar (SV i v) = V i v
 desugar (SConst i c) = Const i c
-desugar (SLam i v ty t) = Lam i v (desugarType ty) (desugar t)
+desugar (SLam i bs t) = foldr (\(x, xty) acc -> Lam i x (desugarType xty) acc) (desugar t) bs
 desugar (SApp i t u) = App i (desugar t) (desugar u)
 desugar (SPrint i str t) = Print i str (desugar t)
 desugar (SBinaryOp i o t u) = BinaryOp i o (desugar t) (desugar u)
 desugar (SFix i f fty x xty t) = Fix i f (desugarType fty) x (desugarType xty) (desugar t)
 desugar (SIfZ i c t e) = IfZ i (desugar c) (desugar t) (desugar e)
 desugar (SLet i v vty def body) = Let i v (desugarType vty) (desugar def) (desugar body)
+desugar (SLetFun i f bs fty def body) = desugar $ SLet i f (buildFunTy bs fty) (SLam i bs def) body
+desugar (SLetRec i f [] fty def body) = error "desugar: no binders in letrec"
+desugar (SLetRec i f [(x, xty)] fty def body) = desugar $ SLet i f (SFunTy xty fty) (SFix i f (SFunTy xty fty) x xty def) body
+desugar (SLetRec i f ((x, xty) : bs) fty def body) = desugar $ SLetRec i f [(x, xty)] (buildFunTy bs fty) (SLam i bs def) body
 
 desugarType :: STy -> Ty
-desugarType SNatTy = NatTy
+desugarType SNatTy             = NatTy
 desugarType (SFunTy sty1 sty2) = FunTy (desugarType sty1) (desugarType sty2)
-desugarType (STySyn sty) = undefined -- TODO: implement
+desugarType (STySyn sty)       = undefined -- TODO: implement
 
 -- | 'elab' transforma variables ligadas en índices de de Bruijn
 -- en un término dado.
