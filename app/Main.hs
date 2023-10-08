@@ -138,7 +138,7 @@ compileFiles (x:xs) = do
         compileFile x
         compileFiles xs
 
-loadFile ::  MonadFD4 m => FilePath -> m [Decl NTerm]
+loadFile ::  MonadFD4 m => FilePath -> m [Decl SNTerm]
 loadFile f = do
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
@@ -171,13 +171,13 @@ parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
-typecheckDecl :: MonadFD4 m => Decl NTerm -> m (Decl Term)
+typecheckDecl :: MonadFD4 m => Decl SNTerm -> m (Decl Term)
 typecheckDecl (Decl p x t) = do
-        let dd = (Decl p x (elab t))
+        let dd = Decl p x (elab t)
         tcDecl dd
         return dd
 
-handleDecl ::  MonadFD4 m => Decl NTerm -> m ()
+handleDecl ::  MonadFD4 m => Decl SNTerm -> m ()
 handleDecl d = do
         (Decl p x tt) <- typecheckDecl d
         te <- eval tt
@@ -266,7 +266,7 @@ compilePhrase x =
       Left d  -> handleDecl d
       Right t -> handleTerm t
 
-handleTerm ::  MonadFD4 m => NTerm -> m ()
+handleTerm ::  MonadFD4 m => SNTerm -> m ()
 handleTerm t = do
          let tt = elab t
          s <- get
@@ -281,9 +281,9 @@ printPhrase x =
     x' <- parseIO "<interactive>" tm x
     let ex = elab x'
     t  <- case x' of
-           (V p f) -> maybe ex id <$> lookupDecl f
+           (SV p f) -> maybe ex id <$> lookupDecl f
            _       -> return ex
-    printFD4 "NTerm:"
+    printFD4 "SNTerm:"
     printFD4 (show x')
     printFD4 "\nTerm:"
     printFD4 (show t)

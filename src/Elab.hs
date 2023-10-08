@@ -15,10 +15,26 @@ module Elab ( elab, elab_decl ) where
 import           Lang
 import           Subst
 
+desugar :: SNTerm -> NTerm
+desugar (SV i v) = V i v
+desugar (SConst i c) = Const i c
+desugar (SLam i v ty t) = Lam i v (desugarType ty) (desugar t)
+desugar (SApp i t u) = App i (desugar t) (desugar u)
+desugar (SPrint i str t) = Print i str (desugar t)
+desugar (SBinaryOp i o t u) = BinaryOp i o (desugar t) (desugar u)
+desugar (SFix i f fty x xty t) = Fix i f (desugarType fty) x (desugarType xty) (desugar t)
+desugar (SIfZ i c t e) = IfZ i (desugar c) (desugar t) (desugar e)
+desugar (SLet i v vty def body) = Let i v (desugarType vty) (desugar def) (desugar body)
+
+desugarType :: STy -> Ty
+desugarType SNatTy = NatTy
+desugarType (SFunTy sty1 sty2) = FunTy (desugarType sty1) (desugarType sty2)
+desugarType (STySyn sty) = undefined -- TODO: implement
+
 -- | 'elab' transforma variables ligadas en índices de de Bruijn
 -- en un término dado.
-elab :: NTerm -> Term
-elab = elab' []
+elab :: SNTerm -> Term
+elab = elab' [] . desugar
 
 elab' :: [Name] -> NTerm -> Term
 elab' env (V p v) =
@@ -40,5 +56,5 @@ elab' env (BinaryOp i o t u) = BinaryOp i o (elab' env t) (elab' env u)
 elab' env (App p h a) = App p (elab' env h) (elab' env a)
 elab' env (Let p v vty def body) = Let p v vty (elab' env def) (close v (elab' (v:env) body))
 
-elab_decl :: Decl NTerm -> Decl Term
+elab_decl :: Decl SNTerm -> Decl Term
 elab_decl = fmap elab
