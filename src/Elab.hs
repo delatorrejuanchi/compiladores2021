@@ -25,6 +25,7 @@ desugar (SConst i c) = Const i c
 desugar (SLam i bs t) = foldr (\(x, xty) acc -> Lam i x (desugarType xty) acc) (desugar t) bs
 desugar (SApp i t u) = App i (desugar t) (desugar u)
 desugar (SPrint i str t) = Print i str (desugar t)
+desugar (SPrintEta i str) = desugar $ SLam i [("x", SNatTy)] (SPrint i str (SV i "x"))
 desugar (SBinaryOp i o t u) = BinaryOp i o (desugar t) (desugar u)
 desugar (SFix i f fty x xty t) = Fix i f (desugarType fty) x (desugarType xty) (desugar t)
 desugar (SIfZ i c t e) = IfZ i (desugar c) (desugar t) (desugar e)

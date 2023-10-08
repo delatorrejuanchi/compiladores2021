@@ -68,6 +68,7 @@ data STm info var
   | SLam info [(Name, STy)] (STm info var)
   | SApp info (STm info var) (STm info var)
   | SPrint info String (STm info var)
+  | SPrintEta info String
   | SBinaryOp info BinaryOp (STm info var) (STm info var)
   | SFix info Name STy Name STy (STm info var)
   | SIfZ info (STm info var) (STm info var) (STm info var)
