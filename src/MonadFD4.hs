@@ -68,7 +68,7 @@ setLastFile filename = modify (\s -> s {lfile = filename})
 getLastFile :: MonadFD4 m => m FilePath
 getLastFile = gets lfile
 
-addDecl :: MonadFD4 m => Decl Term -> m ()
+addDecl :: MonadFD4 m => Decl Ty Term -> m ()
 addDecl d = modify (\s -> s { glb = d : glb s, cantDecl = cantDecl s + 1 })
 
 addTy :: MonadFD4 m => Name -> Ty -> m ()
@@ -82,14 +82,15 @@ eraseLastFileDecls = do
           tyEnv' = deleteTy (map declName era) (tyEnv s)
       modify (\s -> s {glb = rem, cantDecl = 0, tyEnv = tyEnv'})
    where deleteTy xs ps = deleteFirstsBy (\x y -> fst x == fst y) ps (map (flip (,) NatTy) xs)
-hasName :: Name -> Decl a -> Bool
+hasName :: Name -> Decl a b -> Bool
 hasName nm (Decl { declName = nm' }) = nm == nm'
 
 lookupDecl :: MonadFD4 m => Name -> m (Maybe Term)
 lookupDecl nm = do
      s <- get
      case filter (hasName nm) (glb s) of
-       (Decl { declBody=e }):_ -> return (Just e)
+       Decl { declBody=e }:_ -> return (Just e)
+       DeclTy { declTy = ty }:_ -> return Nothing
        []                      -> return Nothing
 
 lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)

@@ -10,40 +10,73 @@ Este módulo permite elaborar términos y declaraciones para convertirlas desde
 fully named (@NTerm) a locally closed (@Term@)
 -}
 
-module Elab ( elab, elab_decl ) where
+module Elab ( elab, elab_decl, desugarType, buildFunTy ) where
 
 import           Lang
 import           Subst
+import MonadFD4
 
 buildFunTy :: [(Name, STy)] -> STy -> STy
 buildFunTy [] rty             = rty
 buildFunTy ((_, ty) : bs) rty = SFunTy ty (buildFunTy bs rty)
 
-desugar :: SNTerm -> NTerm
-desugar (SV i v) = V i v
-desugar (SConst i c) = Const i c
-desugar (SLam i bs t) = foldr (\(x, xty) acc -> Lam i x (desugarType xty) acc) (desugar t) bs
-desugar (SApp i t u) = App i (desugar t) (desugar u)
-desugar (SPrint i str t) = Print i str (desugar t)
+desugarFunTys :: MonadFD4 m => [(Name, STy)] -> m [(Name, Ty)]
+desugarFunTys = traverse (\(x, xty) -> do { xty' <- desugarType xty; return (x, xty') })
+
+desugar :: MonadFD4 m => SNTerm -> m NTerm
+desugar (SV i v) = return $ V i v
+desugar (SConst i c) = return $ Const i c
+desugar (SLam i bs t) = do
+  t' <- desugar t
+  bs' <- desugarFunTys bs -- TODO: do not iterate twice
+  return $ foldr (\(x, xty) acc -> Lam i x xty acc) t' bs'
+desugar (SApp i t u) = do
+  t' <- desugar t
+  u' <- desugar u
+  return $ App i t' u'
+desugar (SPrint i str t) = do
+  t' <- desugar t
+  return $ Print i str t'
 desugar (SPrintEta i str) = desugar $ SLam i [("x", SNatTy)] (SPrint i str (SV i "x"))
-desugar (SBinaryOp i o t u) = BinaryOp i o (desugar t) (desugar u)
-desugar (SFix i f fty x xty t) = Fix i f (desugarType fty) x (desugarType xty) (desugar t)
-desugar (SIfZ i c t e) = IfZ i (desugar c) (desugar t) (desugar e)
-desugar (SLet i v vty def body) = Let i v (desugarType vty) (desugar def) (desugar body)
+desugar (SBinaryOp i o t u) = do
+  t' <- desugar t
+  u' <- desugar u
+  return $ BinaryOp i o t' u'
+desugar (SFix i f fty x xty t) = do
+  fty' <- desugarType fty
+  xty' <- desugarType xty
+  t' <- desugar t
+  return $ Fix i f fty' x xty' t'
+desugar (SIfZ i c t e) = do
+  c' <- desugar c
+  t' <- desugar t
+  e' <- desugar e
+  return $ IfZ i c' t' e'
+desugar (SLet i v vty def body) = do
+  vty' <- desugarType vty
+  def' <- desugar def
+  body' <- desugar body
+  return $ Let i v vty' def' body'
 desugar (SLetFun i f bs fty def body) = desugar $ SLet i f (buildFunTy bs fty) (SLam i bs def) body
 desugar (SLetRec i f [] fty def body) = error "desugar: no binders in letrec"
 desugar (SLetRec i f [(x, xty)] fty def body) = desugar $ SLet i f (SFunTy xty fty) (SFix i f (SFunTy xty fty) x xty def) body
 desugar (SLetRec i f ((x, xty) : bs) fty def body) = desugar $ SLetRec i f [(x, xty)] (buildFunTy bs fty) (SLam i bs def) body
 
-desugarType :: STy -> Ty
-desugarType SNatTy             = NatTy
-desugarType (SFunTy sty1 sty2) = FunTy (desugarType sty1) (desugarType sty2)
-desugarType (STySyn sty)       = undefined -- TODO: implement
+desugarType :: MonadFD4 m => STy -> m Ty
+desugarType SNatTy = return NatTy
+desugarType (SFunTy ty1 ty2) = do
+  ty1' <- desugarType ty1
+  ty2' <- desugarType ty2
+  return $ FunTy ty1' ty2'
+desugarType (STySyn name) = do
+  ty <- lookupTy name
+  case ty of Nothing -> failFD4 $ "unknown type synonym for " ++ show ty
+             Just ty' -> return ty'
 
 -- | 'elab' transforma variables ligadas en índices de de Bruijn
 -- en un término dado.
-elab :: SNTerm -> Term
-elab = elab' [] . desugar
+elab :: MonadFD4 m => SNTerm -> m Term
+elab t = elab' [] <$> desugar t
 
 elab' :: [Name] -> NTerm -> Term
 elab' env (V p v) =
@@ -65,5 +98,9 @@ elab' env (BinaryOp i o t u) = BinaryOp i o (elab' env t) (elab' env u)
 elab' env (App p h a) = App p (elab' env h) (elab' env a)
 elab' env (Let p v vty def body) = Let p v vty (elab' env def) (close v (elab' (v:env) body))
 
-elab_decl :: Decl SNTerm -> Decl Term
-elab_decl = fmap elab
+elab_decl :: MonadFD4 m => Decl STy SNTerm -> m (Decl Ty Term)
+elab_decl (Decl p n ty t) = do
+  ty' <- desugarType ty
+  t' <- elab t
+  return $ Decl p n ty' t'
+elab_decl (DeclTy p n ty) = DeclTy p n <$> desugarType ty

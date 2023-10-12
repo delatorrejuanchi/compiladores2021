@@ -27,7 +27,8 @@ import           System.Exit
 import           Options.Applicative
 --import Data.Text.Lazy (unpack)
 
-import           Elab                     (elab)
+--import Data.Text.Lazy (unpack)
+import           Elab                     (elab, desugarType)
 import           Errors
 import           Eval                     (eval)
 import           Global                   (GlEnv (..))
@@ -137,7 +138,7 @@ compileFiles (x:xs) = do
         compileFile x
         compileFiles xs
 
-loadFile ::  MonadFD4 m => FilePath -> m [Decl SNTerm]
+loadFile ::  MonadFD4 m => FilePath -> m [Decl STy SNTerm]
 loadFile f = do
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
@@ -170,17 +171,25 @@ parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
-typecheckDecl :: MonadFD4 m => Decl SNTerm -> m (Decl Term)
-typecheckDecl (Decl p x t) = do
-        let dd = Decl p x (elab t)
+typecheckDecl :: MonadFD4 m => Decl STy SNTerm -> m (Decl Ty Term)
+typecheckDecl (Decl p x ty t) = do
+        ty' <- desugarType ty
+        t' <- elab t
+        let dd = Decl p x ty' t'
         tcDecl dd
         return dd
+typecheckDecl (DeclTy p x ty) = do
+  ty' <- desugarType ty
+  return $ DeclTy p x ty'
 
-handleDecl ::  MonadFD4 m => Decl SNTerm -> m ()
+handleDecl ::  MonadFD4 m => Decl STy SNTerm -> m ()
 handleDecl d = do
-        (Decl p x tt) <- typecheckDecl d
-        te <- eval tt
-        addDecl (Decl p x te)
+        dd <- typecheckDecl d
+        case dd of
+          Decl p x ty tt -> do
+            te <- eval tt
+            addDecl (Decl p x ty te)
+          DeclTy p x ty -> addTy x ty
 
 data Command = Compile CompileForm
              | PPrint String
@@ -265,23 +274,23 @@ compilePhrase x =
       Left d  -> handleDecl d
       Right t -> handleTerm t
 
-handleTerm ::  MonadFD4 m => SNTerm -> m ()
+handleTerm :: MonadFD4 m => SNTerm -> m ()
 handleTerm t = do
-         let tt = elab t
+         tt <- elab t
          s <- get
          ty <- tc tt (tyEnv s)
          te <- eval tt
          ppte <- pp te
          printFD4 (ppte ++ " : " ++ ppTy ty)
 
-printPhrase   :: MonadFD4 m => String -> m ()
+printPhrase :: MonadFD4 m => String -> m ()
 printPhrase x =
   do
     x' <- parseIO "<interactive>" tm x
-    let ex = elab x'
+    ex <- elab x'
     t  <- case x' of
            (SV p f) -> maybe ex id <$> lookupDecl f
-           _       -> return ex
+           _        -> return ex
     printFD4 "SNTerm:"
     printFD4 (show x')
     printFD4 "\nTerm:"
@@ -290,7 +299,7 @@ printPhrase x =
 typeCheckPhrase :: MonadFD4 m => String -> m ()
 typeCheckPhrase x = do
          t <- parseIO "<interactive>" tm x
-         let tt = elab t
+         tt <- elab t
          s <- get
          ty <- tc tt (tyEnv s)
          printFD4 (ppTy ty)

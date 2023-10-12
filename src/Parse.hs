@@ -13,6 +13,7 @@ import           Common
 import           Control.Monad.Identity                 (Identity)
 import           Control.Monad.RWS                      (MonadState (get))
 import           Data.Char                              (isNumber, ord)
+import           Elab                                   (buildFunTy)
 import           Lang
 import           Prelude                                hiding (const)
 import           Text.Parsec                            hiding (oneOf, parse,
@@ -89,9 +90,10 @@ getPos = do
   return $ Pos (sourceLine pos) (sourceColumn pos)
 
 tyatom :: P STy
-tyatom =
-  (reserved "Nat" >> return SNatTy)
-    <|> parens typeP
+tyatom = (reserved "Nat" >> return SNatTy)
+         <|> (STySyn <$> var)
+         <|> parens typeP
+
 
 typeP :: P STy
 typeP = oneOf [SFunTy <$> tyatom <*> (reservedOp "->" >> typeP), tyatom]
@@ -216,22 +218,64 @@ tm :: P SNTerm
 tm = oneOf [app, lam, ifz, printOp, fix, letexp]
 
 -- | Parser de declaraciones
-decl :: P (Decl SNTerm)
-decl = do
+
+-- TODO: do not build function type and term here
+declfun :: P (Decl STy SNTerm)
+declfun = do
   i <- getPos
   reserved "let"
-  v <- var
+  f <- var
+  bs <- many1 $ parens binding
+  reservedOp ":"
+  rty <- typeP
+  reservedOp "="
+  def <- expr
+  let ty = buildFunTy bs rty
+  return $ Decl i f ty (SLam i bs def)
+
+-- TODO: do not build function type and term here
+declfunrec :: P (Decl STy SNTerm)
+declfunrec = do
+  i <- getPos
+  reserved "let"
+  reserved "rec"
+  f <- var
+  bs <- many1 $ parens binding
+  reservedOp ":"
+  rty <- typeP
+  reservedOp "="
+  def <- expr
+  let ty = buildFunTy bs rty
+  return $ Decl i f ty $ uncurry (SFix i f ty) (head bs) (SLam i (tail bs) def)
+
+declvar :: P (Decl STy SNTerm)
+declvar = do
+  i <- getPos
+  reserved "let"
+  (v, ty) <- binding
   reservedOp "="
   t <- expr
-  return (Decl i v t)
+  return (Decl i v ty t)
+
+decltype :: P (Decl STy SNTerm)
+decltype = do
+  i <- getPos
+  reserved "type"
+  ty <- var
+  reservedOp "="
+  tydef <- typeP
+  return (DeclTy i ty tydef)
+
+decl :: P (Decl STy SNTerm)
+decl = oneOf [decltype, declfun, declfunrec, declvar]
 
 -- | Parser de programas (listas de declaraciones)
-program :: P [Decl SNTerm]
+program :: P [Decl STy SNTerm]
 program = many decl
 
 -- | Parsea una declaración a un término
 -- Útil para las sesiones interactivas
-declOrTm :: P (Either (Decl SNTerm) SNTerm)
+declOrTm :: P (Either (Decl STy SNTerm) SNTerm)
 declOrTm = try (Left <$> decl) <|> (Right <$> expr)
 
 -- Corre un parser, chequeando que se pueda consumir toda la entrada

@@ -73,7 +73,7 @@ pattern PRINTN   = 14
 bc :: MonadFD4 m => Term -> m Bytecode
 bc t = error "implementame"
 
-type Module = [Decl Term]
+type Module = [Decl Ty Term]
 
 bytecompileModule :: MonadFD4 m => Module -> m Bytecode
 bytecompileModule = error "implementame"
