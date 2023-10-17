@@ -12,12 +12,13 @@ fully named (@NTerm) a locally closed (@Term@)
 
 module Elab ( elab, elab_decl ) where
 
+import           Data.List.NonEmpty
 import           Lang
 import           Subst
 
-buildFunTy :: [(Name, STy)] -> STy -> STy
-buildFunTy [] rty             = rty
-buildFunTy ((_, ty) : bs) rty = SFunTy ty (buildFunTy bs rty)
+buildFunTy :: Binders -> STy -> STy
+buildFunTy ((_, xty):|[]) rty   = SFunTy xty rty
+buildFunTy ((_, xty):|b:bb) rty = SFunTy xty (buildFunTy (b:|bb) rty)
 
 desugar :: SNTerm -> NTerm
 desugar (SV i v) = V i v
@@ -25,15 +26,14 @@ desugar (SConst i c) = Const i c
 desugar (SLam i bs t) = foldr (\(x, xty) acc -> Lam i x (desugarType xty) acc) (desugar t) bs
 desugar (SApp i t u) = App i (desugar t) (desugar u)
 desugar (SPrint i str t) = Print i str (desugar t)
-desugar (SPrintEta i str) = desugar $ SLam i [("x", SNatTy)] (SPrint i str (SV i "x"))
+desugar (SPrintEta i str) = desugar $ SLam i (("x", SNatTy):|[]) (SPrint i str (SV i "x"))
 desugar (SBinaryOp i o t u) = BinaryOp i o (desugar t) (desugar u)
 desugar (SFix i f fty x xty t) = Fix i f (desugarType fty) x (desugarType xty) (desugar t)
 desugar (SIfZ i c t e) = IfZ i (desugar c) (desugar t) (desugar e)
 desugar (SLet i v vty def body) = Let i v (desugarType vty) (desugar def) (desugar body)
-desugar (SLetFun i f bs fty def body) = desugar $ SLet i f (buildFunTy bs fty) (SLam i bs def) body
-desugar (SLetRec i f [] fty def body) = error "desugar: no binders in letrec"
-desugar (SLetRec i f [(x, xty)] fty def body) = desugar $ SLet i f (SFunTy xty fty) (SFix i f (SFunTy xty fty) x xty def) body
-desugar (SLetRec i f ((x, xty) : bs) fty def body) = desugar $ SLetRec i f [(x, xty)] (buildFunTy bs fty) (SLam i bs def) body
+desugar (SLetFun i f bs rty def body) = desugar $ SLet i f (buildFunTy bs rty) (SLam i bs def) body
+desugar (SLetRec i f bs@((x, xty):|[]) fty def body) = desugar $ SLet i f (buildFunTy bs fty) (SFix i f (buildFunTy bs fty) x xty def) body
+desugar (SLetRec i f bs@((x, xty):|b:bb) fty def body) = desugar $ SLetRec i f ((x, xty):|[]) (buildFunTy (b:|bb) fty) (SLam i (b:|bb) def) body
 
 desugarType :: STy -> Ty
 desugarType SNatTy             = NatTy

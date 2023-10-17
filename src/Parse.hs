@@ -11,6 +11,7 @@ module Parse (tm, Parse.parse, decl, runP, P, program, declOrTm) where
 
 import           Common
 import           Control.Monad.Identity                 (Identity)
+import           Data.List.NonEmpty                     hiding (map)
 import           Lang
 import           Prelude                                hiding (const)
 import           Text.Parsec                            hiding (oneOf, parse,
@@ -112,6 +113,12 @@ binding = do
   ty <- typeP
   return (v, ty)
 
+binders :: P Binders
+binders = do
+  b <- parens binding
+  bb <- many (parens binding)
+  return (b :| bb)
+
 expr :: P SNTerm
 expr = Ex.buildExpressionParser table tm
 
@@ -146,7 +153,7 @@ lam :: P SNTerm
 lam = do
   i <- getPos
   reserved "fun"
-  bs <- many1 $ parens binding
+  bs <- binders
   reservedOp "->"
   t <- expr
   return (SLam i bs t)
@@ -191,7 +198,7 @@ letfun = do
   i <- getPos
   reserved "let"
   f <- var
-  bs <- many1 $ parens binding
+  bs <- binders
   reservedOp ":"
   rty <- typeP
   reservedOp "="
@@ -206,7 +213,7 @@ letrec = do
   reserved "let"
   reserved "rec"
   f <- var
-  bs <- many1 $ parens binding
+  bs <- binders
   reservedOp ":"
   rty <- typeP
   reservedOp "="

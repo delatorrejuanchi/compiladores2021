@@ -15,8 +15,9 @@
 --   - Variables
 module Lang where
 
-import           Common          (Pos)
-import           Data.List.Extra (nubSort)
+import           Common             (Pos)
+import           Data.List.Extra    (nubSort)
+import           Data.List.NonEmpty (NonEmpty)
 
 -- | AST de Tipos
 data Ty
@@ -65,7 +66,7 @@ data STy
 data STm info var
   = SV info var
   | SConst info Const
-  | SLam info [(Name, STy)] (STm info var)
+  | SLam info Binders (STm info var)
   | SApp info (STm info var) (STm info var)
   | SPrint info String (STm info var)
   | SPrintEta info String
@@ -73,9 +74,11 @@ data STm info var
   | SFix info Name STy Name STy (STm info var)
   | SIfZ info (STm info var) (STm info var) (STm info var)
   | SLet info Name STy (STm info var) (STm info var)
-  | SLetFun info Name [(Name, STy)] STy (STm info var) (STm info var)
-  | SLetRec info Name [(Name, STy)] STy (STm info var) (STm info var)
+  | SLetFun info Name Binders STy (STm info var) (STm info var)
+  | SLetRec info Name Binders STy (STm info var) (STm info var)
   deriving (Show, Functor)
+
+type Binders = NonEmpty (Name, STy)
 
 type NTerm =
   -- | 'Tm' tiene 'Name's como variables ligadas y libres y globales, guarda posición
