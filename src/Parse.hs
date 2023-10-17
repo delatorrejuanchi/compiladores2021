@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use <$>" #-}
 -- |
 -- Module      : Parse
 -- Description : Define un parser de términos FD40 a términos fully named.
@@ -8,11 +10,7 @@
 module Parse (tm, Parse.parse, decl, runP, P, program, declOrTm) where
 
 import           Common
---( GenLanguageDef(..), emptyDef )
-
 import           Control.Monad.Identity                 (Identity)
-import           Control.Monad.RWS                      (MonadState (get))
-import           Data.Char                              (isNumber, ord)
 import           Lang
 import           Prelude                                hiding (const)
 import           Text.Parsec                            hiding (oneOf, parse,
@@ -22,10 +20,14 @@ import qualified Text.Parsec.Expr                       as Ex
 import qualified Text.Parsec.Token                      as Tok
 import           Text.ParserCombinators.Parsec.Language
 
+type P = Parsec String ()
+
+-----------------------
+-- Helpers
+-----------------------
+
 oneOf :: [P a] -> P a
 oneOf = choice . map try
-
-type P = Parsec String ()
 
 -----------------------
 -- Lexer
@@ -61,11 +63,11 @@ natural = Tok.natural lexer
 stringLiteral :: P String
 stringLiteral = Tok.stringLiteral lexer
 
-parens :: P a -> P a
-parens = Tok.parens lexer
-
 identifier :: P String
 identifier = Tok.identifier lexer
+
+parens :: P a -> P a
+parens = Tok.parens lexer
 
 reserved :: String -> P ()
 reserved = Tok.reserved lexer
@@ -77,27 +79,50 @@ reservedOp = Tok.reservedOp lexer
 -- Parsers
 -----------------------
 
+typeP :: P STy
+typeP = oneOf [typeFun, typeAtom]
+
+typeFun :: P STy
+typeFun = SFunTy <$> typeAtom <*> (reservedOp "->" >> typeP)
+
+typeAtom :: P STy
+typeAtom = oneOf [typeNat, parens typeP]
+
+typeNat :: P STy
+typeNat = reserved "Nat" >> return SNatTy
+
 num :: P Int
 num = fromInteger <$> natural
 
 var :: P Name
 var = identifier
 
+const :: P Const
+const = CNat <$> num
+
 getPos :: P Pos
 getPos = do
   pos <- getPosition
   return $ Pos (sourceLine pos) (sourceColumn pos)
 
-tyatom :: P STy
-tyatom =
-  (reserved "Nat" >> return SNatTy)
-    <|> parens typeP
+binding :: P (Name, STy)
+binding = do
+  v <- var
+  reservedOp ":"
+  ty <- typeP
+  return (v, ty)
 
-typeP :: P STy
-typeP = oneOf [SFunTy <$> tyatom <*> (reservedOp "->" >> typeP), tyatom]
+expr :: P SNTerm
+expr = Ex.buildExpressionParser table tm
 
-const :: P Const
-const = CNat <$> num
+table :: [[Operator String () Identity SNTerm]]
+table = [[binary "+" Add Ex.AssocLeft, binary "-" Sub Ex.AssocLeft]]
+
+binary :: String -> BinaryOp -> Assoc -> Operator String () Identity SNTerm
+binary s f = Ex.Infix (reservedOp s >> return (SBinaryOp NoPos f))
+
+tm :: P SNTerm
+tm = oneOf [printOp, app, lam, ifz, fix, letexp]
 
 printOp :: P SNTerm
 printOp = do
@@ -106,29 +131,16 @@ printOp = do
   str <- option "" stringLiteral
   oneOf [SPrint i str <$> expr, return $ SPrintEta i str]
 
-binary :: String -> BinaryOp -> Assoc -> Operator String () Identity SNTerm
-binary s f = Ex.Infix (reservedOp s >> return (SBinaryOp NoPos f))
-
-table :: [[Operator String () Identity SNTerm]]
-table =
-  [ [ binary "+" Add Ex.AssocLeft,
-      binary "-" Sub Ex.AssocLeft
-    ]
-  ]
-
-expr :: P SNTerm
-expr = Ex.buildExpressionParser table tm
+-- NOTE: app parsea un atom o la aplicación de varios atom.
+app :: P SNTerm
+app = do
+  i <- getPos
+  f <- atom
+  args <- many atom
+  return (foldl (SApp i) f args)
 
 atom :: P SNTerm
 atom = oneOf [SConst <$> getPos <*> const, SV <$> getPos <*> var, parens expr, printOp]
-
--- parsea un par (variable : tipo)
-binding :: P (Name, STy)
-binding = do
-  v <- var
-  reservedOp ":"
-  ty <- typeP
-  return (v, ty)
 
 lam :: P SNTerm
 lam = do
@@ -138,14 +150,6 @@ lam = do
   reservedOp "->"
   t <- expr
   return (SLam i bs t)
-
--- Nota el parser app también parsea un solo atom.
-app :: P SNTerm
-app = do
-  i <- getPos
-  f <- atom
-  args <- many atom
-  return (foldl (SApp i) f args)
 
 ifz :: P SNTerm
 ifz = do
@@ -211,11 +215,9 @@ letrec = do
   body <- expr
   return (SLetRec i f bs rty def body)
 
--- | Parser de términos
-tm :: P SNTerm
-tm = oneOf [app, lam, ifz, printOp, fix, letexp]
+program :: P [Decl SNTerm]
+program = many decl
 
--- | Parser de declaraciones
 decl :: P (Decl SNTerm)
 decl = do
   i <- getPos
@@ -225,14 +227,8 @@ decl = do
   t <- expr
   return (Decl i v t)
 
--- | Parser de programas (listas de declaraciones)
-program :: P [Decl SNTerm]
-program = many decl
-
--- | Parsea una declaración a un término
--- Útil para las sesiones interactivas
 declOrTm :: P (Either (Decl SNTerm) SNTerm)
-declOrTm = try (Left <$> decl) <|> (Right <$> expr)
+declOrTm = oneOf [Left <$> decl <* eof, Right <$> expr <* eof]
 
 -- Corre un parser, chequeando que se pueda consumir toda la entrada
 runP :: P a -> String -> String -> Either ParseError a
