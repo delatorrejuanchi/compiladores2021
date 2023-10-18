@@ -34,12 +34,14 @@ data BinaryOp = Add | Sub
   deriving (Show)
 
 -- | tipo de datos de declaraciones, parametrizado por el tipo del cuerpo de la declaración
-data Decl a = Decl
-  { declPos  :: Pos,
-    declName :: Name,
-    declBody :: a
-  }
+data Decl a = Decl { declPos :: Pos, declName :: Name, declType :: Ty, declBody :: a }
   deriving (Show, Functor)
+
+data SDecl
+  = SDeclVar Pos Name STy SNTerm
+  | SDeclFun Pos Name Binders STy SNTerm
+  | SDeclRec Pos Name Binders STy SNTerm
+  deriving (Show)
 
 -- | AST de los términos.
 --   - info es información extra que puede llevar cada nodo.
@@ -60,7 +62,6 @@ data Tm info var
 data STy
   = SNatTy
   | SFunTy STy STy
-  | STySyn Name
   deriving (Show, Eq)
 
 data STm info var

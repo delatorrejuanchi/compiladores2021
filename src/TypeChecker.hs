@@ -95,15 +95,13 @@ domCod :: MonadFD4 m => Term -> Ty -> m (Ty, Ty)
 domCod t (FunTy d c) = return (d, c)
 domCod t ty = typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy ty
 
--- | 'tcDecl' chequea el tipo de una declaración
--- y la agrega al entorno de tipado de declaraciones globales
-tcDecl :: MonadFD4 m  => Decl Term -> m ()
-tcDecl (Decl p n t) = do
-    --chequear si el nombre ya está declarado
-    mty <- lookupTy n
-    case mty of
-        Nothing -> do  --no está declarado
-                  s <- get
-                  ty <- tc t (tyEnv s)
-                  addTy n ty
-        Just _  -> failPosFD4 p $ n ++" ya está declarado"
+-- | 'tcDecl' chequea el tipo de una declaración, y verifica que no esté declarada.
+tcDecl :: MonadFD4 m  => Decl Term -> m Ty
+tcDecl (Decl p n ty t) = do
+  mty <- lookupTy n
+  case mty of
+    Nothing -> do
+      s <- get
+      ty' <- tc t (tyEnv s)
+      expect ty ty' t
+    Just _ -> failPosFD4 p $ n ++ " ya está declarado"

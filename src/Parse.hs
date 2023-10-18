@@ -222,19 +222,48 @@ letrec = do
   body <- expr
   return (SLetRec i f bs rty def body)
 
-program :: P [Decl SNTerm]
+program :: P [SDecl]
 program = many decl
 
-decl :: P (Decl SNTerm)
-decl = do
+decl :: P SDecl
+decl = oneOf [declfun, declrec, declvar]
+
+declfun :: P SDecl
+declfun = do
   i <- getPos
   reserved "let"
-  v <- var
+  f <- var
+  bs <- binders
+  reservedOp ":"
+  rty <- typeP
+  reservedOp "="
+  def <- expr
+  return $ SDeclFun i f bs rty def
+
+declrec :: P SDecl
+declrec = do
+  i <- getPos
+  reserved "let"
+  reserved "rec"
+  f <- var
+  bs <- binders
+  reservedOp ":"
+  rty <- typeP
+  reservedOp "="
+  def <- expr
+  return $ SDeclRec i f bs rty def
+
+declvar :: P SDecl
+declvar = do
+  i <- getPos
+  reserved "let"
+  (v, ty) <- binding
   reservedOp "="
   t <- expr
-  return (Decl i v t)
+  return (SDeclVar i v ty t)
 
-declOrTm :: P (Either (Decl SNTerm) SNTerm)
+
+declOrTm :: P (Either SDecl SNTerm)
 declOrTm = oneOf [Left <$> decl <* eof, Right <$> expr <* eof]
 
 -- Corre un parser, chequeando que se pueda consumir toda la entrada

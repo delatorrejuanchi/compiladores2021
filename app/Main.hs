@@ -20,21 +20,18 @@ import           Control.Exception        (IOException, catch)
 import           Control.Monad.Trans
 import           Data.Char                (isSpace)
 import           Data.List                (intersperse, isPrefixOf, nub)
-import           System.IO                (hPrint, hPutStrLn, stderr)
-
-import           System.Exit
---import System.Process ( system )
-import           Options.Applicative
---import Data.Text.Lazy (unpack)
-
-import           Elab                     (elab)
+import           Data.Maybe
+import           Elab                     (elab, elabDecl)
 import           Errors
 import           Eval                     (eval)
 import           Global                   (GlEnv (..))
 import           Lang
 import           MonadFD4
+import           Options.Applicative
 import           PPrint                   (pp, ppDecl, ppTy)
 import           Parse                    (P, declOrTm, program, runP, tm)
+import           System.Exit
+import           System.IO                (hPrint, hPutStrLn, stderr)
 import           TypeChecker              (tc, tcDecl)
 
 prompt :: String
@@ -137,8 +134,9 @@ compileFiles (x:xs) = do
         compileFile x
         compileFiles xs
 
-loadFile ::  MonadFD4 m => FilePath -> m [Decl SNTerm]
+loadFile ::  MonadFD4 m => FilePath -> m [SDecl]
 loadFile f = do
+    printFD4 ("Abriendo "++f++"...")
     let filename = reverse(dropWhile isSpace (reverse f))
     x <- liftIO $ catch (readFile filename)
                (\e -> do let err = show (e :: IOException)
@@ -149,38 +147,26 @@ loadFile f = do
 
 compileFile ::  MonadFD4 m => FilePath -> m ()
 compileFile f = do
-    printFD4 ("Abriendo "++f++"...")
-    let filename = reverse(dropWhile isSpace (reverse f))
-    x <- liftIO $ catch (readFile filename)
-               (\e -> do let err = show (e :: IOException)
-                         hPutStrLn stderr ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err)
-                         return "")
-    decls <- parseIO filename program x
-    mapM_ handleDecl decls
+  decls <- loadFile f
+  mapM_ handleDecl decls
 
 typecheckFile ::  MonadFD4 m => Bool -> FilePath -> m ()
 typecheckFile opt f = do
-    printFD4  ("Chequeando "++f)
-    decls <- loadFile f
-    ppterms <- mapM (typecheckDecl >=> ppDecl) decls
-    mapM_ printFD4 ppterms
+  decls <- loadFile f
+  mapM_ handleDecl decls
 
 parseIO ::  MonadFD4 m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
-typecheckDecl :: MonadFD4 m => Decl SNTerm -> m (Decl Term)
-typecheckDecl (Decl p x t) = do
-        let dd = Decl p x (elab t)
-        tcDecl dd
-        return dd
-
-handleDecl ::  MonadFD4 m => Decl SNTerm -> m ()
+handleDecl ::  MonadFD4 m => SDecl -> m ()
 handleDecl d = do
-        (Decl p x tt) <- typecheckDecl d
-        te <- eval tt
-        addDecl (Decl p x te)
+  d' <- elabDecl d
+  ty <- tcDecl d'
+  addTy (declName d') ty
+  addDecl d'
+  ppDecl d' >>= printFD4
 
 data Command = Compile CompileForm
              | PPrint String
@@ -257,7 +243,7 @@ handleCommand cmd = do
        PPrint e   -> printPhrase e >> return True
        Type e    -> typeCheckPhrase e >> return True
 
-compilePhrase ::  MonadFD4 m => String -> m ()
+compilePhrase :: MonadFD4 m => String -> m ()
 compilePhrase x =
   do
     dot <- parseIO "<interactive>" declOrTm x
@@ -265,32 +251,32 @@ compilePhrase x =
       Left d  -> handleDecl d
       Right t -> handleTerm t
 
-handleTerm ::  MonadFD4 m => SNTerm -> m ()
+handleTerm :: MonadFD4 m => SNTerm -> m ()
 handleTerm t = do
-         let tt = elab t
+         t' <- elab t
          s <- get
-         ty <- tc tt (tyEnv s)
-         te <- eval tt
+         ty <- tc t' (tyEnv s)
+         te <- eval t'
          ppte <- pp te
          printFD4 (ppte ++ " : " ++ ppTy ty)
 
-printPhrase   :: MonadFD4 m => String -> m ()
-printPhrase x =
+printPhrase :: MonadFD4 m => String -> m ()
+printPhrase phrase =
   do
-    x' <- parseIO "<interactive>" tm x
-    let ex = elab x'
-    t  <- case x' of
-           (SV p f) -> maybe ex id <$> lookupDecl f
-           _       -> return ex
+    t <- parseIO "<interactive>" tm phrase
+    et <- elab t
+    t' <- case t of (SV p f) -> fromMaybe et <$> lookupDecl f
+                    _        -> return et
     printFD4 "SNTerm:"
-    printFD4 (show x')
-    printFD4 "\nTerm:"
     printFD4 (show t)
+    printFD4 "\nTerm:"
+    printFD4 (show t')
+
 
 typeCheckPhrase :: MonadFD4 m => String -> m ()
 typeCheckPhrase x = do
          t <- parseIO "<interactive>" tm x
-         let tt = elab t
+         t' <- elab t
          s <- get
-         ty <- tc tt (tyEnv s)
+         ty <- tc t' (tyEnv s)
          printFD4 (ppTy ty)

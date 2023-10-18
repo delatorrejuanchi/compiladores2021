@@ -10,40 +10,66 @@ Este módulo permite elaborar términos y declaraciones para convertirlas desde
 fully named (@NTerm) a locally closed (@Term@)
 -}
 
-module Elab ( elab, elab_decl ) where
+module Elab ( elab, elabDecl ) where
 
 import           Data.List.NonEmpty
 import           Lang
+import           MonadFD4
 import           Subst
 
 buildFunTy :: Binders -> STy -> STy
 buildFunTy ((_, xty):|[]) rty   = SFunTy xty rty
 buildFunTy ((_, xty):|b:bb) rty = SFunTy xty (buildFunTy (b:|bb) rty)
 
-desugar :: SNTerm -> NTerm
-desugar (SV i v) = V i v
-desugar (SConst i c) = Const i c
-desugar (SLam i bs t) = foldr (\(x, xty) acc -> Lam i x (desugarType xty) acc) (desugar t) bs
-desugar (SApp i t u) = App i (desugar t) (desugar u)
-desugar (SPrint i str t) = Print i str (desugar t)
+desugar :: MonadFD4 m => SNTerm -> m NTerm
+desugar (SV i v) = return $ V i v
+desugar (SConst i c) = return $ Const i c
+desugar (SLam i bs t) = do
+  t' <- desugar t
+  bs' <- mapM (\(x, xty) -> (,) x <$> desugarType xty) bs
+  return $ foldr (\(x, xty) acc -> Lam i x xty acc) t' bs'
+desugar (SApp i t u) = do
+  t' <- desugar t
+  u' <- desugar u
+  return $ App i t' u'
+desugar (SPrint i str t) = do
+  t' <- desugar t
+  return $ Print i str t'
+desugar (SBinaryOp i o t u) = do
+  t' <- desugar t
+  u' <- desugar u
+  return $ BinaryOp i o t' u'
+desugar (SFix i f fty x xty t) = do
+  fty' <- desugarType fty
+  xty' <- desugarType xty
+  t' <- desugar t
+  return $ Fix i f fty' x xty' t'
+desugar (SIfZ i c t e) = do
+  c' <- desugar c
+  t' <- desugar t
+  e' <- desugar e
+  return $ IfZ i c' t' e'
+desugar (SLet i x xty def body) = do
+  xty' <- desugarType xty
+  def' <- desugar def
+  body' <- desugar body
+  return $ Let i x xty' def' body'
 desugar (SPrintEta i str) = desugar $ SLam i (("x", SNatTy):|[]) (SPrint i str (SV i "x"))
-desugar (SBinaryOp i o t u) = BinaryOp i o (desugar t) (desugar u)
-desugar (SFix i f fty x xty t) = Fix i f (desugarType fty) x (desugarType xty) (desugar t)
-desugar (SIfZ i c t e) = IfZ i (desugar c) (desugar t) (desugar e)
-desugar (SLet i v vty def body) = Let i v (desugarType vty) (desugar def) (desugar body)
 desugar (SLetFun i f bs rty def body) = desugar $ SLet i f (buildFunTy bs rty) (SLam i bs def) body
-desugar (SLetRec i f bs@((x, xty):|[]) fty def body) = desugar $ SLet i f (buildFunTy bs fty) (SFix i f (buildFunTy bs fty) x xty def) body
-desugar (SLetRec i f bs@((x, xty):|b:bb) fty def body) = desugar $ SLetRec i f ((x, xty):|[]) (buildFunTy (b:|bb) fty) (SLam i (b:|bb) def) body
+desugar (SLetRec i f ((x, xty):|[]) rty def body) = desugar $ SLet i f (SFunTy xty rty) (SFix i f (SFunTy xty rty) x xty def) body
+desugar (SLetRec i f bs@((x, xty):|b:bb) rty def body) = desugar $ SLetRec i f ((x, xty):|[]) (buildFunTy (b:|bb) rty) (SLam i (b:|bb) def) body
 
-desugarType :: STy -> Ty
-desugarType SNatTy             = NatTy
-desugarType (SFunTy sty1 sty2) = FunTy (desugarType sty1) (desugarType sty2)
-desugarType (STySyn sty)       = undefined -- TODO: implement
+desugarType :: MonadFD4 m => STy -> m Ty
+desugarType SNatTy = return NatTy
+desugarType (SFunTy ty1 ty2) = do
+  ty1' <- desugarType ty1
+  ty2' <- desugarType ty2
+  return $ FunTy ty1' ty2'
 
--- | 'elab' transforma variables ligadas en índices de de Bruijn
+-- | 'elab' transforma variables ligadas en índices de Bruijn
 -- en un término dado.
-elab :: SNTerm -> Term
-elab = elab' [] . desugar
+elab :: MonadFD4 m => SNTerm -> m Term
+elab t = elab' [] <$> desugar t
 
 elab' :: [Name] -> NTerm -> Term
 elab' env (V p v) =
@@ -65,5 +91,21 @@ elab' env (BinaryOp i o t u) = BinaryOp i o (elab' env t) (elab' env u)
 elab' env (App p h a) = App p (elab' env h) (elab' env a)
 elab' env (Let p v vty def body) = Let p v vty (elab' env def) (close v (elab' (v:env) body))
 
-elab_decl :: Decl SNTerm -> Decl Term
-elab_decl = fmap elab
+desugarDecl :: MonadFD4 m => SDecl -> m (Decl NTerm)
+desugarDecl (SDeclVar i x xty def) = do
+  xty' <- desugarType xty
+  def' <- desugar def
+  return $ Decl i x xty' def'
+desugarDecl (SDeclFun i f bs rty def) = do
+  fty <- desugarType (buildFunTy bs rty)
+  def' <- desugar (SLam i bs def)
+  return $ Decl i f fty def'
+desugarDecl (SDeclRec i f ((x, xty):|[]) rty def) = do
+  let fty = SFunTy xty rty
+  fty' <- desugarType fty
+  def' <- desugar (SFix i f fty x xty def)
+  return $ Decl i f fty' def'
+desugarDecl (SDeclRec i f bs@((x, xty):|b:bb) rty def) = desugarDecl $ SDeclRec i f ((x, xty):|[]) (buildFunTy (b:|bb) rty) (SLam i (b:|bb) def)
+
+elabDecl :: MonadFD4 m => SDecl -> m (Decl Term)
+elabDecl d = fmap (elab' []) <$> desugarDecl d
