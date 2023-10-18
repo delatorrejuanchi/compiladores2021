@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Use <$>" #-}
+
 -- |
 -- Module      : Parse
 -- Description : Define un parser de términos FD40 a términos fully named.
@@ -9,17 +11,16 @@
 -- Stability   : experimental
 module Parse (tm, Parse.parse, decl, runP, P, program, declOrTm) where
 
-import           Common
-import           Control.Monad.Identity                 (Identity)
-import           Data.List.NonEmpty                     hiding (map)
-import           Lang
-import           Prelude                                hiding (const)
-import           Text.Parsec                            hiding (oneOf, parse,
-                                                         runP)
-import           Text.Parsec.Expr                       (Assoc, Operator)
-import qualified Text.Parsec.Expr                       as Ex
-import qualified Text.Parsec.Token                      as Tok
-import           Text.ParserCombinators.Parsec.Language
+import Common (Pos (..))
+import Control.Monad.Identity (Identity)
+import Data.List.NonEmpty (NonEmpty ((:|)))
+import Lang
+import Text.Parsec hiding (oneOf, runP)
+import Text.Parsec.Expr (Assoc, Operator)
+import qualified Text.Parsec.Expr as Ex
+import qualified Text.Parsec.Token as Tok
+import Text.ParserCombinators.Parsec.Language
+import Prelude hiding (const)
 
 type P = Parsec String ()
 
@@ -262,7 +263,6 @@ declvar = do
   t <- expr
   return (SDeclVar i v ty t)
 
-
 declOrTm :: P (Either SDecl SNTerm)
 declOrTm = oneOf [Left <$> decl <* eof, Right <$> expr <* eof]
 
@@ -274,4 +274,4 @@ runP p s filename = runParser (whiteSpace *> p <* eof) () filename s
 parse :: String -> SNTerm
 parse s = case runP expr s "" of
   Right t -> t
-  Left e  -> error ("no parse: " ++ show s)
+  Left e -> error ("no parse: " ++ show s)
