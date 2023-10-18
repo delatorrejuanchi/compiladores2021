@@ -37,6 +37,7 @@ import           MonadFD4
 import           PPrint                   (pp, ppDecl, ppTy)
 import           Parse                    (P, declOrTm, program, runP, tm)
 import           TypeChecker              (tc, tcDecl)
+import           CEK                      (evalCEK)
 
 prompt :: String
 prompt = "FD4> "
@@ -47,7 +48,7 @@ prompt = "FD4> "
 data Mode =
     Interactive
   | Typecheck
--- | InteractiveCEK
+  | InteractiveCEK
 -- | Bytecompile
 -- | RunVM
 -- | CC
@@ -59,7 +60,7 @@ data Mode =
 parseMode :: Parser (Mode,Bool)
 parseMode = (,) <$>
       (flag' Typecheck ( long "typecheck" <> short 't' <> help "Chequear tipos e imprimir el término")
-  -- <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
+      <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
   -- <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
   -- <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
       <|> flag Interactive Interactive ( long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
@@ -86,11 +87,13 @@ main = execParser opts >>= go
 
     go :: (Mode,Bool,[FilePath]) -> IO ()
     go (Interactive,_,files) =
-              do runFD4 (runInputT defaultSettings (repl files))
+              do runFD4 (runInputT defaultSettings (repl files Interactive))
                  return ()
     go (Typecheck,opt, files) =
               runOrFail $ mapM_ (typecheckFile opt) files
-    -- go (InteractiveCEK,_, files) = undefined
+    go (InteractiveCEK,_, files) =
+              do runFD4 (runInputT defaultSettings (repl files InteractiveCEK))
+                 return ()
     -- go (Bytecompile,_, files) =
     --           runOrFail $ mapM_ bytecompileFile files
     -- go (RunVM,_,files) =
@@ -113,8 +116,8 @@ runOrFail m = do
       exitWith (ExitFailure 1)
     Right v -> return v
 
-repl :: (MonadFD4 m, MonadMask m) => [FilePath] -> InputT m ()
-repl args = do
+repl :: (MonadFD4 m, MonadMask m) => [FilePath] -> Mode -> InputT m ()
+repl args mode = do
        lift $ catchErrors $ compileFiles args
        s <- lift get
        when (inter s) $ liftIO $ putStrLn
@@ -128,7 +131,7 @@ repl args = do
                Just "" -> loop
                Just x -> do
                        c <- liftIO $ interpretCommand x
-                       b <- lift $ catchErrors $ handleCommand c
+                       b <- lift $ catchErrors $ handleCommand c mode
                        maybe loop (`when` loop) b
 
 compileFiles ::  MonadFD4 m => [FilePath] -> m ()
@@ -248,8 +251,8 @@ helpTxt cs
 
 -- | 'handleCommand' interpreta un comando y devuelve un booleano
 -- indicando si se debe salir del programa o no.
-handleCommand ::  MonadFD4 m => Command  -> m Bool
-handleCommand cmd = do
+handleCommand ::  MonadFD4 m => Command -> Mode -> m Bool
+handleCommand cmd mode = do
    s@GlEnv {..} <- get
    case cmd of
        Quit   ->  return False
@@ -259,29 +262,33 @@ handleCommand cmd = do
                       return True
        Compile c ->
                   do  case c of
-                          CompileInteractive e -> compilePhrase e
+                          CompileInteractive e -> compilePhrase e mode
                           CompileFile f        -> put (s {lfile=f, cantDecl=0}) >> compileFile f
                       return True
        Reload ->  eraseLastFileDecls >> (getLastFile >>= compileFile) >> return True
        PPrint e   -> printPhrase e >> return True
        Type e    -> typeCheckPhrase e >> return True
 
-compilePhrase ::  MonadFD4 m => String -> m ()
-compilePhrase x =
+compilePhrase ::  MonadFD4 m => String -> Mode -> m ()
+compilePhrase x mode =
   do
     dot <- parseIO "<interactive>" declOrTm x
     case dot of
       Left d  -> handleDecl d
-      Right t -> handleTerm t
+      Right t -> handleTerm t mode
 
-handleTerm :: MonadFD4 m => SNTerm -> m ()
-handleTerm t = do
+handleTerm :: MonadFD4 m => SNTerm -> Mode -> m ()
+handleTerm t mode = do
          tt <- elab t
          s <- get
          ty <- tc tt (tyEnv s)
-         te <- eval tt
+         te <- evalTerm mode tt
          ppte <- pp te
          printFD4 (ppte ++ " : " ++ ppTy ty)
+  where
+    evalTerm :: MonadFD4 m => Mode -> Term -> m Term
+    evalTerm InteractiveCEK = evalCEK
+    evalTerm _ = eval
 
 printPhrase :: MonadFD4 m => String -> m ()
 printPhrase x =
