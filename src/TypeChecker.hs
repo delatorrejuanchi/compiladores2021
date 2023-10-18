@@ -67,7 +67,7 @@ tc (Let p v ty def t) bs = do
 tc (BinaryOp p op t u) bs = do
          tty <- tc t bs
          expect NatTy tty t
-         uty <- tc t bs
+         uty <- tc u bs
          expect NatTy uty u
 
 -- | @'typeError' t s@ lanza un error de tipo para el término @t@
