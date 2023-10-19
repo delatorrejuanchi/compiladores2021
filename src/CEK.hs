@@ -74,5 +74,5 @@ evalCEK t = do
     where
         toTerm :: Val -> Term
         toTerm (ValNum n) = Const NoPos (CNat n)
-        toTerm (ValClos (ClosFun p _ f)) = substN (map toTerm p) f
-        toTerm (ValClos (ClosFix p _ f)) = substN (map toTerm p) f
+        toTerm (ValClos (ClosFun p _ f)) = substN (map toTerm (reverse p)) f
+        toTerm (ValClos (ClosFix p _ f)) = substN (map toTerm (reverse p)) f
