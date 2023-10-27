@@ -9,6 +9,7 @@
 -- Stability   : experimental
 module Main where
 
+import Bytecompile (bcRead, bcWrite, bytecompileModule, runBC)
 import CEK (evalCEK)
 import Control.Exception (IOException, catch)
 import Control.Monad.Catch (MonadMask)
@@ -32,6 +33,7 @@ import System.Console.Haskeline
     runInputT,
   )
 import System.Exit
+import System.FilePath (splitExtension)
 import System.IO (hPrint, hPutStrLn, stderr)
 import TypeChecker (tc, tcDecl)
 
@@ -45,9 +47,9 @@ data Mode
   = Interactive
   | Typecheck
   | InteractiveCEK
+  | Bytecompile
+  | RunVM
 
--- | Bytecompile
--- | RunVM
 -- | CC
 -- | Canon
 -- | LLVM
@@ -59,8 +61,8 @@ parseMode =
   (,)
     <$> ( flag' Typecheck (long "typecheck" <> short 't' <> help "Chequear tipos e imprimir el término")
             <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
-            -- <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
-            -- <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
+            <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
+            <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
             <|> flag Interactive Interactive (long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
             -- <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
             -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
@@ -98,11 +100,11 @@ main = execParser opts >>= go
       do
         runFD4 (runInputT defaultSettings (repl files InteractiveCEK))
         return ()
+    go (Bytecompile, _, files) =
+      runOrFail $ mapM_ bytecompileFile files
+    go (RunVM, _, files) =
+      runOrFail $ mapM_ bytecodeRun files
 
--- go (Bytecompile,_, files) =
---           runOrFail $ mapM_ bytecompileFile files
--- go (RunVM,_,files) =
---           runOrFail $ mapM_ bytecodeRun files
 -- go (CC,_, files) =
 --           runOrFail $ mapM_ ccFile files
 -- go (Canon,_, files) =
@@ -175,6 +177,17 @@ typecheckFile :: MonadFD4 m => Bool -> FilePath -> m ()
 typecheckFile opt f = do
   decls <- loadFile f
   mapM_ handleDecl decls
+
+bytecompileFile :: MonadFD4 m => FilePath -> m ()
+bytecompileFile f = do
+  decls <- loadFile f
+  decls' <- mapM elabDecl decls
+  -- mapM_ tcDecl decls' -- FIXME
+  bytecode <- bytecompileModule decls'
+  liftIO $ bcWrite bytecode (fst (splitExtension f) ++ ".byte")
+
+bytecodeRun :: MonadFD4 m => FilePath -> m ()
+bytecodeRun = liftIO . bcRead >=> runBC
 
 parseIO :: MonadFD4 m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of

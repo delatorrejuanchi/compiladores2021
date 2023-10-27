@@ -37,7 +37,7 @@ transform (SLet i x xty def body) = Let i x xty (transform def) (transform body)
 transform (SLam i bs t) = buildFun i bs (transform t)
 transform (SPrintEta i str) = Lam i "x" SNatTy (Print i str (V i "x"))
 transform (SLetFun i f bs rty def body) = Let i f (buildFunTy bs rty) (buildFun i bs $ transform def) (transform body)
-transform (SLetRec i f bs rty def body) = Let i f (buildFunTy bs rty) (buildRecFun i f bs rty (transform def)) (transform body)
+transform (SLetRec i f bs rty def body) = Let i f (buildFunTy bs rty) (buildRecFun i f bs rty $ transform def) (transform body)
 
 desugarType :: MonadFD4 m => STy -> m Ty
 desugarType SNatTy = return NatTy
