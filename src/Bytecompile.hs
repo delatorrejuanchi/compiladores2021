@@ -24,7 +24,7 @@ import qualified Data.ByteString.Lazy as BS
 import Data.Char (ord)
 import GHC.Char (chr)
 import Lang
-import MonadFD4 (MonadFD4, printFD4)
+import MonadFD4 (MonadFD4, printFD4, putCharFD4)
 import Subst (close)
 
 type Opcode = Int
@@ -168,11 +168,11 @@ runBC' :: MonadFD4 m => Bytecode -> Env -> Stack -> m ()
 runBC' [] _ _ = return ()
 runBC' (CONST : n : cs) env stack = runBC' cs env (I n : stack)
 runBC' (ADD : cs) env (I n : I m : stack) = runBC' cs env (I (m + n) : stack)
-runBC' (SUB : cs) env (I n : I m : stack) = runBC' cs env (I (m - n) : stack)
+runBC' (SUB : cs) env (I n : I m : stack) = runBC' cs env (I (max (m - n) 0) : stack)
 runBC' (ACCESS : i : cs) env stack = runBC' cs env (env !! i : stack)
-runBC' (CALL : cs) env (v : Fun fe fb : stack) = runBC' fb (v : fe) (RA env cs : stack)
+runBC' (CALL : cs) env (v : Fun ef cf : stack) = runBC' cf (v : ef) (RA env cs : stack)
 runBC' (FUNCTION : skip : cs) env stack = runBC' (drop skip cs) env (Fun env (take skip cs) : stack)
-runBC' (RETURN : cs) _ (v : RA fe fb : stack) = runBC' fb fe (v : stack)
+runBC' (RETURN : cs) _ (v : RA ef cf : stack) = runBC' cf ef (v : stack)
 runBC' (SHIFT : cs) env (v : stack) = runBC' cs (v : env) stack
 runBC' (DROP : cs) (_ : env) stack = runBC' cs env stack
 runBC' (PRINTN : cs) env stack@(I n : _) = printFD4 (show n) >> runBC' cs env stack
@@ -183,9 +183,9 @@ runBC' (PRINT : cs) env stack = do
     go [] = undefined
     go (NULL : k) = return k
     go (char : k) = putCharFD4 (chr char) >> go k
-runBC' (FIX : cs) env (Fun fe fb : stack) = runBC' cs env (Fun efx fb : stack)
+runBC' (FIX : cs) env (Fun ef cf : stack) = runBC' cs env (Fun efx cf : stack)
   where
-    efx = Fun efx fb : env
+    efx = Fun efx cf : env
 runBC' (IFZ : _ : cs) env (I 0 : stack) = runBC' cs env stack
 runBC' (IFZ : skipt : cs) env (_ : stack) = runBC' (drop skipt cs) env stack
 runBC' (JUMP : skip : cs) env stack = runBC' (drop skip cs) env stack
