@@ -89,7 +89,7 @@ domCod t (FunTy d c) = return (d, c)
 domCod t ty = typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy ty
 
 -- | 'tcDecl' chequea el tipo de una declaración, y verifica que no esté declarada.
-tcDecl :: MonadFD4 m => Decl Term -> m Ty
+tcDecl :: MonadFD4 m => DeclTerm -> m Ty
 tcDecl (Decl p n ty t) = do
   mty <- lookupTy n
   case mty of

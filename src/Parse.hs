@@ -114,11 +114,19 @@ binding = do
   ty <- typeP
   return (v, ty)
 
-binders :: P Binders
-binders = do
-  b <- parens binding
-  bb <- many (parens binding)
-  return (b :| bb)
+multibinding :: P (NonEmpty Name, STy)
+multibinding = do
+  v <- var
+  vv <- many var
+  reservedOp ":"
+  ty <- typeP
+  return (v :| vv, ty)
+
+multibinders :: P Binders
+multibinders = do
+  b <- parens multibinding
+  bb <- many (parens multibinding)
+  return $ multibindersToBinders (b :| bb)
 
 expr :: P SNTerm
 expr = Ex.buildExpressionParser table tm
@@ -154,7 +162,7 @@ lam :: P SNTerm
 lam = do
   i <- getPos
   reserved "fun"
-  bs <- binders
+  bs <- multibinders
   reservedOp "->"
   t <- expr
   return (SLam i bs t)
@@ -199,7 +207,7 @@ letfun = do
   i <- getPos
   reserved "let"
   f <- var
-  bs <- binders
+  bs <- multibinders
   reservedOp ":"
   rty <- typeP
   reservedOp "="
@@ -214,7 +222,7 @@ letrec = do
   reserved "let"
   reserved "rec"
   f <- var
-  bs <- binders
+  bs <- multibinders
   reservedOp ":"
   rty <- typeP
   reservedOp "="
@@ -234,7 +242,7 @@ declfun = do
   i <- getPos
   reserved "let"
   f <- var
-  bs <- binders
+  bs <- multibinders
   reservedOp ":"
   rty <- typeP
   reservedOp "="
@@ -247,7 +255,7 @@ declrec = do
   reserved "let"
   reserved "rec"
   f <- var
-  bs <- binders
+  bs <- multibinders
   reservedOp ":"
   rty <- typeP
   reservedOp "="

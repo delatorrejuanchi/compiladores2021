@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE TupleSections #-}
 
 -- |
 -- Module      : Lang
@@ -17,7 +18,7 @@ module Lang where
 
 import Common (Pos)
 import Data.List.Extra (nubSort)
-import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty (NonEmpty ((:|)), toList)
 
 -- | AST de Tipos
 data Ty
@@ -27,15 +28,15 @@ data Ty
 
 type Name = String
 
-data Const = CNat Int
+newtype Const = CNat Int
   deriving (Show)
 
 data BinaryOp = Add | Sub
   deriving (Show)
 
--- | tipo de datos de declaraciones, parametrizado por el tipo del cuerpo de la declaración
-data Decl a = Decl {declPos :: Pos, declName :: Name, declType :: Ty, declBody :: a}
-  deriving (Show, Functor)
+-- | tipo de datos de declaraciones
+data Decl var ty = Decl {declPos :: Pos, declName :: Name, declType :: ty, declBody :: Tm Pos var ty}
+  deriving (Show, Functor, Foldable, Traversable)
 
 data SDecl
   = SDeclVar Pos Name STy SNTerm
@@ -47,51 +48,57 @@ data SDecl
 --   - info es información extra que puede llevar cada nodo.
 --       Por ahora solo la usamos para guardar posiciones en el código fuente.
 --   - var es el tipo de la variables. Es 'Name' para fully named y 'Var' para locally closed.
-data Tm info var
+data Tm info var ty
   = V info var
   | Const info Const
-  | Lam info Name Ty (Tm info var)
-  | App info (Tm info var) (Tm info var)
-  | Print info String (Tm info var)
-  | BinaryOp info BinaryOp (Tm info var) (Tm info var)
-  | Fix info Name Ty Name Ty (Tm info var)
-  | IfZ info (Tm info var) (Tm info var) (Tm info var)
-  | Let info Name Ty (Tm info var) (Tm info var)
-  deriving (Show, Functor)
+  | Lam info Name ty (Tm info var ty)
+  | App info (Tm info var ty) (Tm info var ty)
+  | Print info String (Tm info var ty)
+  | BinaryOp info BinaryOp (Tm info var ty) (Tm info var ty)
+  | Fix info Name ty Name ty (Tm info var ty)
+  | IfZ info (Tm info var ty) (Tm info var ty) (Tm info var ty)
+  | Let info Name ty (Tm info var ty) (Tm info var ty)
+  deriving (Show, Functor, Foldable, Traversable)
 
 data STy
   = SNatTy
   | SFunTy STy STy
   deriving (Show, Eq)
 
-data STm info var
-  = SV info var
-  | SConst info Const
-  | SLam info Binders (STm info var)
-  | SApp info (STm info var) (STm info var)
-  | SPrint info String (STm info var)
-  | SPrintEta info String
-  | SBinaryOp info BinaryOp (STm info var) (STm info var)
-  | SFix info Name STy Name STy (STm info var)
-  | SIfZ info (STm info var) (STm info var) (STm info var)
-  | SLet info Name STy (STm info var) (STm info var)
-  | SLetFun info Name Binders STy (STm info var) (STm info var)
-  | SLetRec info Name Binders STy (STm info var) (STm info var)
-  deriving (Show, Functor)
+data SNTerm
+  = SV Pos Name
+  | SConst Pos Const
+  | SApp Pos SNTerm SNTerm
+  | SPrint Pos String SNTerm
+  | SBinaryOp Pos BinaryOp SNTerm SNTerm
+  | SFix Pos Name STy Name STy SNTerm
+  | SIfZ Pos SNTerm SNTerm SNTerm
+  | SLet Pos Name STy SNTerm SNTerm
+  | SLam Pos Binders SNTerm
+  | SPrintEta Pos String
+  | SLetFun Pos Name Binders STy SNTerm SNTerm
+  | SLetRec Pos Name Binders STy SNTerm SNTerm
+  deriving (Show)
 
 type Binders = NonEmpty (Name, STy)
 
-type NTerm =
-  -- | 'Tm' tiene 'Name's como variables ligadas y libres y globales, guarda posición
-  Tm Pos Name
+type Multibinders = NonEmpty (NonEmpty Name, STy)
 
-type Term =
-  -- | 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición
-  Tm Pos Var
+multibindersToBinders :: Multibinders -> Binders
+multibindersToBinders ((x :| xs, xty) :| []) = (x, xty) :| map (,xty) xs
+multibindersToBinders ((x :| xs, xty) :| b : bb) = (x, xty) :| map (,xty) xs <> toList (multibindersToBinders (b :| bb))
 
-type SNTerm =
-  -- | (Sugar) 'STm' tiene 'Name's como variables ligadas y libres y globales, guarda posición
-  STm Pos Name
+-- | 'Tm' con 'Name's como variables ligadas y libres y globales, guarda posición
+type NTerm = Tm Pos Name Ty
+
+-- | 'Decl' para NTerms
+type DeclNTerm = Decl Name Ty
+
+-- | 'Tm' con índices de De Bruijn como variables ligadas, y nombres para libres y globales, guarda posición
+type Term = Tm Pos Var Ty
+
+-- | 'Decl' para Terms
+type DeclTerm = Decl Var Ty
 
 data Var
   = Bound !Int
@@ -100,7 +107,7 @@ data Var
   deriving (Show)
 
 -- | Obtiene la info en la raíz del término.
-getInfo :: Tm info var -> info
+getInfo :: Tm info var ty -> info
 getInfo (V i _) = i
 getInfo (Const i _) = i
 getInfo (Lam i _ _ _) = i
@@ -112,7 +119,7 @@ getInfo (Let i _ _ _ _) = i
 getInfo (BinaryOp i _ _ _) = i
 
 -- | Obtiene los nombres de variables (abiertas o globales) de un término.
-freeVars :: Tm info Var -> [Name]
+freeVars :: Tm info Var ty -> [Name]
 freeVars tm = nubSort $ go tm []
   where
     go (V _ (Free v)) xs = v : xs
