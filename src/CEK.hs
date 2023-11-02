@@ -5,28 +5,26 @@
 -- License     : GPL-3
 -- Maintainer  : none
 -- Stability   : experimental
-
 module CEK where
 
+import Common
+import Eval
 import Lang
 import MonadFD4
 import PPrint
-import Eval
-import Common
 import Subst (substN)
-
 
 data Val = ValNum Int | ValClos Clos deriving (Show)
 
 type Env = [Val]
 
-data Clos =
-  ClosFun Env Term Term
-  | ClosFix Env Term Term 
+data Clos
+  = ClosFun Env Term Term
+  | ClosFix Env Term Term
   deriving (Show)
 
-data Frame =
-    KArg Env Term
+data Frame
+  = KArg Env Term
   | KClos Clos
   | KIFz Env Term Term
   | KOpL Env BinaryOp Term
@@ -45,17 +43,17 @@ search (App _ t u) p k = search t p (KArg p u : k)
 search (V _ (Bound i)) p k = destroy (p !! i) k
 search (V _ (Free _)) p k = undefined
 search (V _ (Global nm)) p k = do
-    t <- lookupDecl nm
-    case t of
-        Just t' -> search t' p k
-        Nothing -> failFD4 $ "Error de ejecución: variable no declarada: " ++ ppName nm
+  t <- maybeGetDecl nm
+  case t of
+    Just t' -> search t' p k
+    Nothing -> failFD4 $ "Error de ejecución: Variable no declarada: " ++ ppName nm
 search (Const _ (CNat n)) p k = destroy (ValNum n) k
 search f@(Lam _ _ _ t) p k = destroy (ValClos (ClosFun p t f)) k
 search (Let _ _ _ t u) p k = search t p (KLet p u : k)
 search f@(Fix _ _ _ _ _ t) p k = destroy (ValClos (ClosFix p t f)) k
 
 destroy :: MonadFD4 m => Val -> Kont -> m Val
-destroy v@(ValNum n) (KPrint s : k) =  printFD4 (s ++ show n) >> destroy v k
+destroy v@(ValNum n) (KPrint s : k) = printFD4 (s ++ show n) >> destroy v k
 destroy v@(ValNum n) (KOpL p op u : k) = search u p (KOpR op v : k)
 destroy (ValNum n) (KOpR op (ValNum m) : k) = destroy (ValNum (semOp op m n)) k
 destroy (ValNum 0) (KIFz p t e : k) = search t p k
@@ -69,13 +67,13 @@ destroy _ _ = undefined
 
 evalCEK :: MonadFD4 m => Term -> m Term
 evalCEK t = do
-    v <- search t [] []
-    return $ toTerm v
-    where
-        toTerm :: Val -> Term
-        toTerm (ValNum n) = Const NoPos (CNat n)
-        toTerm (ValClos (ClosFun p _ f)) = substN' (map toTerm p) f
-        toTerm (ValClos (ClosFix p _ f)) = substN' (map toTerm p) f
+  v <- search t [] []
+  return $ toTerm v
+  where
+    toTerm :: Val -> Term
+    toTerm (ValNum n) = Const NoPos (CNat n)
+    toTerm (ValClos (ClosFun p _ f)) = substN' (map toTerm p) f
+    toTerm (ValClos (ClosFix p _ f)) = substN' (map toTerm p) f
 
-        substN' :: [Term] -> Term -> Term
-        substN' = substN . reverse
+    substN' :: [Term] -> Term -> Term
+    substN' = substN . reverse

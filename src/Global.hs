@@ -1,23 +1,26 @@
-{-|
-Module      : Global
-Description : Define el estado global del compilador
-Copyright   : (c) Mauro Jaskelioff, Guido Martínez, 2020.
-License     : GPL-3
-Maintainer  : mauro@fceia.unr.edu.ar
-Stability   : experimental
-
--}
+-- |
+-- Module      : Global
+-- Description : Define el estado global del compilador
+-- Copyright   : (c) Mauro Jaskelioff, Guido Martínez, 2020.
+-- License     : GPL-3
+-- Maintainer  : mauro@fceia.unr.edu.ar
+-- Stability   : experimental
 module Global where
 
-import           Lang
+import Lang
 
-data GlEnv = GlEnv {
-  inter    :: Bool,        --  ^ True, si estamos en modo interactivo.
-  lfile    :: String,      -- ^ Último archivo cargado.
-  cantDecl :: Int,      -- ^ Cantidad de declaraciones desde la última carga
-  glb      :: [Decl Ty Term],   -- ^ Entorno con declaraciones globales
-  tyEnv    :: [(Name,Ty)]  -- ^ Entorno de tipado de declaraciones globales
-}
+data GlEnv = GlEnv
+  { -- | True, si estamos en modo interactivo.
+    inter :: Bool,
+    -- | Último archivo cargado.
+    lfile :: String,
+    -- | Cantidad de declaraciones desde la última carga
+    cantDecl :: Int,
+    -- | Entorno con declaraciones globales
+    glb :: [DeclTerm],
+    -- | Entorno de tipado de declaraciones globales
+    tyEnv :: [(Name, Ty)]
+  }
 
 -- | Valor del estado inicial
 initialEnv :: GlEnv
