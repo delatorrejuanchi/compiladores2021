@@ -93,6 +93,8 @@ pattern PRINTN = 14
 
 pattern JUMP = 15
 
+pattern TAILCALL = 16
+
 data Val = I Int | Fun Env Bytecode | RA Env Bytecode
 
 type Env = [Val]
@@ -104,8 +106,8 @@ bc (V _ (Bound i)) = return [ACCESS, i]
 bc (V _ _) = undefined
 bc (Const _ (CNat n)) = return [CONST, n]
 bc (Lam _ _ _ t) = do
-  t' <- bc t
-  return $ FUNCTION : (length t' + 1) : t' ++ [RETURN]
+  t' <- bcT t
+  return $ FUNCTION : length t' : t'
 bc (App _ t u) = do
   -- NOTE: (\t u -> t ++ u ++ [CALL]) <$> bc t <*> bc u
   t' <- bc t
@@ -120,8 +122,8 @@ bc (BinaryOp _ op t u) = do
   let cop = case op of Add -> ADD; Sub -> SUB
   return $ t' ++ u' ++ [cop]
 bc (Fix _ _ _ _ _ t) = do
-  t' <- bc t
-  return $ FUNCTION : (length t' + 1) : t' ++ [RETURN, FIX]
+  t' <- bcT t
+  return $ FUNCTION : length t' : t' ++ [FIX]
 bc (IfZ _ c t e) = do
   c' <- bc c
   t' <- bc t
@@ -131,6 +133,24 @@ bc (Let _ _ _ e t) = do
   e' <- bc e
   t' <- bc t
   return $ e' ++ [SHIFT] ++ t' ++ [DROP]
+
+bcT :: MonadFD4 m => Term -> m Bytecode
+bcT (App _ t u) = do
+  t' <- bc t
+  u' <- bc u
+  return $ t' ++ u' ++ [TAILCALL]
+bcT (IfZ _ c t e) = do
+  c' <- bc c
+  t' <- bcT t
+  e' <- bcT e
+  return $ c' ++ [IFZ, length t' + 2] ++ t' ++ [JUMP, length e'] ++ e'
+bcT (Let _ _ _ e t) = do
+  e' <- bc e
+  t' <- bcT t
+  return $ e' ++ [SHIFT] ++ t'
+bcT t = do
+  t' <- bc t
+  return $ t' ++ [RETURN]
 
 type Module = [DeclTerm]
 
@@ -189,5 +209,6 @@ runBC' (FIX : cs) env (Fun ef cf : stack) = runBC' cs env (Fun efx cf : stack)
 runBC' (IFZ : _ : cs) env (I 0 : stack) = runBC' cs env stack
 runBC' (IFZ : skipt : cs) env (_ : stack) = runBC' (drop skipt cs) env stack
 runBC' (JUMP : skip : cs) env stack = runBC' (drop skip cs) env stack
+runBC' (TAILCALL : _) env (v : Fun ef cf : stack) = runBC' cf (v : ef) stack
 runBC' [STOP] _ _ = return ()
 runBC' _ _ _ = undefined
