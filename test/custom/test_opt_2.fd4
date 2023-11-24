@@ -1,6 +1,5 @@
-let a : Nat = 1
-let b : Nat = 2
-let c : Nat = 3
-let suma5: Nat -> Nat = fun (x: Nat) -> x + 5
+let a: Nat = 8
+let b: Nat = 5
+let suma (n m: Nat): Nat = n + m
 
-let ret : Nat = suma5 (c + 1)
+let res: Nat = suma a b

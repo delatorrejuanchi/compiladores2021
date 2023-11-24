@@ -52,17 +52,17 @@ closureConvert (Let _ n _ e t) = do
 closureConvert (Lam _ n ty t) = do
   nn <- newName n
   t' <- closureConvert (open nn t)
-  fname <- newName "_"
+  fname <- newName "function"
   let fv = freeVars t
-      clname = fname ++ "__args"
+      clname = fname ++ "_args"
       ff = letter fv t' clname
       codef = IrFun fname [clname, nn] ff
   tell [codef]
   return $ MkClosure fname (map IrVar fv)
 closureConvert (Fix _ f _ x _ t) = do
   xnn <- newName x
-  fnn <- newName $ "rec__" ++ f
-  let clname = fnn ++ "__args"
+  fnn <- newName $ "rec_" ++ f
+  let clname = fnn ++ "_args"
   t' <- closureConvert (openN [clname, xnn] t)
   let fv = freeVars t
       ff = letter fv t' clname
