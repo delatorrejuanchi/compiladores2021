@@ -19,8 +19,8 @@ newName n = do
   put (i + 1)
   return $ n ++ show i
 
-letter :: [Name] -> Ir -> Name -> Ir
-letter nns t clos = foldr (\(x, i) ir -> IrLet x (IrAccess (IrVar clos) i) ir) t xs
+closeIr :: [Name] -> Ir -> Name -> Ir
+closeIr nns t clos = foldr (\(x, i) ir -> IrLet x (IrAccess (IrVar clos) i) ir) t xs
   where
     xs = zip nns [1 ..]
 
@@ -33,7 +33,7 @@ closureConvert (App _ t u) = do
   nn <- newName "clos_"
   t' <- closureConvert t
   u' <- closureConvert u
-  return $ IrLet nn t' (IrCall (IrAccess (IrVar nn) 0) [t', u'])
+  return $ IrLet nn t' (IrCall (IrAccess (IrVar nn) 0) [IrVar nn, u'])
 closureConvert (Print _ s t) = IrPrint s <$> closureConvert t
 closureConvert (BinaryOp _ op t u) = do
   t' <- closureConvert t
@@ -55,7 +55,7 @@ closureConvert (Lam _ n ty t) = do
   fname <- newName "function"
   let fv = freeVars t
       clname = fname ++ "_args"
-      ff = letter fv t' clname
+      ff = closeIr fv t' clname
       codef = IrFun fname [clname, nn] ff
   tell [codef]
   return $ MkClosure fname (map IrVar fv)
@@ -65,7 +65,7 @@ closureConvert (Fix _ f _ x _ t) = do
   let clname = fnn ++ "_args"
   t' <- closureConvert (openN [clname, xnn] t)
   let fv = freeVars t
-      ff = letter fv t' clname
+      ff = closeIr fv t' clname
       codef = IrFun fnn [clname, xnn] ff
   tell [codef]
   return $ MkClosure fnn (map IrVar fv)
