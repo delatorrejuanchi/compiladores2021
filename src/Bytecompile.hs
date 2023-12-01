@@ -155,7 +155,6 @@ bcT t = do
 
 bytecompile :: MonadFD4 m => Term -> m Bytecode
 bytecompile t = do
-  pp t >>= printFD4
   bytec <- bc t
   return $ bytec ++ [PRINTN, STOP]
 
