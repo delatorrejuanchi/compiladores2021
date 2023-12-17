@@ -183,8 +183,7 @@ bytecompileFile :: MonadFD4 m => Bool -> FilePath -> m ()
 bytecompileFile opt f = do
   decls <- loadFile f
   decls' <- mapM elabDecl decls
-  mapM_ addDecl decls'
-  -- mapM_ tcDecl decls' -- FIXME: typecheck
+  mapM_ addTcDecl decls'
   t <- if opt then optimize (transform decls') else return (transform decls')
   bytecode <- bytecompile t
   liftIO $ bcWrite bytecode (fst (splitExtension f) ++ ".byte")
@@ -193,6 +192,11 @@ bytecompileFile opt f = do
     transform [] = error "No main function"
     transform [Decl _ _ _ t] = t
     transform (Decl p n ty t : ds) = Let p n ty t (close n (glob2free (transform ds)))
+    addTcDecl :: MonadFD4 m => DeclTerm -> m ()
+    addTcDecl decl = do
+      ty <- tcDecl decl
+      addTy (declName decl) ty
+      addDecl decl
 
 bytecodeRun :: MonadFD4 m => FilePath -> m ()
 bytecodeRun = liftIO . bcRead >=> runBC
@@ -201,9 +205,14 @@ ccFile :: MonadFD4 m => FilePath -> m ()
 ccFile f = do
   d <- loadFile f
   d' <- mapM elabDecl d
-  -- mapM_ tcDecl d' -- FIXME: typecheck
+  mapM_ tcAddTy d'
   let irdecls = runCC d'
   liftIO $ writeFile (fst (splitExtension f) ++ ".c") (ir2C (IrDecls irdecls))
+  where
+    tcAddTy :: MonadFD4 m => DeclTerm -> m ()
+    tcAddTy decl = do
+      ty <- tcDecl decl
+      addTy (declName decl) ty
 
 parseIO :: MonadFD4 m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
