@@ -182,7 +182,8 @@ typecheckFile opt f = do
 bytecompileFile :: MonadFD4 m => Bool -> FilePath -> m ()
 bytecompileFile opt f = do
   decls <- loadFile f
-  decls' <- mapM elabDecl decls
+  mdecls <- mapM elabDecl decls
+  let decls' = catMaybes mdecls
   mapM_ addTcDecl decls'
   t <- if opt then optimize (transform decls') else return (transform decls')
   bytecode <- bytecompile t
@@ -203,10 +204,11 @@ bytecodeRun = liftIO . bcRead >=> runBC
 
 ccFile :: MonadFD4 m => FilePath -> m ()
 ccFile f = do
-  d <- loadFile f
-  d' <- mapM elabDecl d
-  mapM_ tcAddTy d'
-  let irdecls = runCC d'
+  decls <- loadFile f
+  mdecls <- mapM elabDecl decls
+  let decls' = catMaybes mdecls
+  mapM_ tcAddTy decls'
+  let irdecls = runCC decls'
   liftIO $ writeFile (fst (splitExtension f) ++ ".c") (ir2C (IrDecls irdecls))
   where
     tcAddTy :: MonadFD4 m => DeclTerm -> m ()
@@ -221,11 +223,14 @@ parseIO filename p x = case runP p x filename of
 
 handleDecl :: MonadFD4 m => Bool -> SDecl -> m ()
 handleDecl opt d = do
-  d' <- elabDecl d
-  ty <- tcDecl d'
-  d'' <- if opt then optimizeDecl d' else return d'
-  addTy (declName d'') ty
-  addDecl d''
+  md <- elabDecl d
+  case md of
+    Nothing -> return ()
+    Just d' -> do
+      ty <- tcDecl d'
+      d'' <- if opt then optimizeDecl d' else return d'
+      addTy (declName d'') ty
+      addDecl d''
 
 data Command
   = Compile CompileForm
@@ -308,6 +313,7 @@ handleCommand cmd mode opt = do
     Help -> printFD4 (helpTxt commands) >> return True
     Browse -> do
       printFD4 (unlines [name | name <- reverse (nub (map declName glb))])
+      printFD4 (unlines [name | name <- reverse (nub (map fst tyEnv))])
       return True
     Compile c ->
       do

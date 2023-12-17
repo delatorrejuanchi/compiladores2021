@@ -19,9 +19,11 @@ data GlEnv = GlEnv
     -- | Entorno con declaraciones globales
     glb :: [DeclTerm],
     -- | Entorno de tipado de declaraciones globales
-    tyEnv :: [(Name, Ty)]
+    tyEnv :: [(Name, Ty)],
+    -- | Entorno de sinonimos de tipos
+    typeSynonyms :: [(Name, Ty)]
   }
 
 -- | Valor del estado inicial
 initialEnv :: GlEnv
-initialEnv = GlEnv True "" 0 [] []
+initialEnv = GlEnv True "" 0 [] [] []

@@ -42,6 +42,7 @@ data SDecl
   = SDeclVar Pos Name STy SNTerm
   | SDeclFun Pos Name Binders STy SNTerm
   | SDeclRec Pos Name Binders STy SNTerm
+  | SDeclType Pos Name STy
   deriving (Show)
 
 -- | AST de los términos.
@@ -63,6 +64,7 @@ data Tm info var ty
 data STy
   = SNatTy
   | SFunTy STy STy
+  | STypeSyn Name
   deriving (Show, Eq)
 
 data SNTerm
