@@ -13,9 +13,8 @@ module Elab (elab, elabDecl) where
 import Common (Pos)
 import Data.List.NonEmpty (head, tail)
 import Lang
-import MonadFD4 (MonadFD4, lookupTypeSynonym, addTypeSynonym)
+import MonadFD4 (MonadFD4, lookupTypeSynonym, addTypeSynonym, failFD4, failPosFD4)
 import Subst
-import Data.Maybe (catMaybes)
 
 buildFunTy :: Binders -> STy -> STy
 buildFunTy bs rty = foldr (\(_, xty) acc -> SFunTy xty acc) rty bs
@@ -50,7 +49,7 @@ desugarType (STypeSyn name) = do
   mty <- lookupTypeSynonym name
   case mty of
     Just ty -> return ty
-    Nothing -> error $ "Type " ++ name ++ " not found"
+    Nothing -> failFD4 $ "Type " ++ name ++ " not found"
 
 elab :: MonadFD4 m => SNTerm -> m Term
 elab t = elab' [] <$> traverse desugarType (transform t)
@@ -71,9 +70,13 @@ transformDecl (SDeclVar i v ty t) = return $ Just $ Decl i v ty (transform t)
 transformDecl (SDeclFun i f bs rty def) = return $ Just $ Decl i f (buildFunTy bs rty) (buildFun i bs (transform def))
 transformDecl (SDeclRec i f bs rty def) = return $ Just $ Decl i f (buildFunTy bs rty) (buildRecFun i f bs rty (transform def))
 transformDecl (SDeclType i name ty) = do
-  ty' <- desugarType ty
-  addTypeSynonym name ty'
-  return Nothing
+  mty <- lookupTypeSynonym name
+  case mty of
+    Just _ -> failPosFD4 i $ "Type synonym " ++ name ++ " already exists"
+    Nothing -> do
+      ty' <- desugarType ty
+      addTypeSynonym name ty'
+      return Nothing
 
 elabDecl :: MonadFD4 m => SDecl -> m (Maybe DeclTerm)
 elabDecl d = transformDecl d >>= traverse (fmap elabDecl' . traverse desugarType)
