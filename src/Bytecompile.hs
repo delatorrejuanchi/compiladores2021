@@ -10,7 +10,7 @@
 --
 -- Este módulo permite compilar módulos a la BVM. También provee una implementación de la BVM
 -- para ejecutar bytecode.
-module Bytecompile (Bytecode, runBC, bcWrite, bcRead, bytecompileModule) where
+module Bytecompile (Bytecode, runBC, bcWrite, bcRead, bytecompile) where
 
 import Data.Binary
   ( Binary (get, put),
@@ -26,6 +26,7 @@ import GHC.Char (chr)
 import Lang
 import MonadFD4 (MonadFD4, printFD4, putCharFD4)
 import Subst (close)
+import PPrint (pp)
 
 type Opcode = Int
 
@@ -152,20 +153,11 @@ bcT t = do
   t' <- bc t
   return $ t' ++ [RETURN]
 
-type Module = [DeclTerm]
-
-bytecompileModule :: MonadFD4 m => Module -> m Bytecode
-bytecompileModule decls = do
-  t <- transform decls
+bytecompile :: MonadFD4 m => Term -> m Bytecode
+bytecompile t = do
+  pp t >>= printFD4
   bytec <- bc t
   return $ bytec ++ [PRINTN, STOP]
-  where
-    transform :: MonadFD4 m => Module -> m Term
-    transform [] = error "No main function"
-    transform [Decl _ _ _ t] = return t
-    transform (Decl p n ty t : ds) = do
-      ds' <- transform ds
-      return $ Let p n ty t (close n (glob2free ds'))
 
 -- | Toma un bytecode, lo codifica y lo escribe un archivo
 bcWrite :: Bytecode -> FilePath -> IO ()

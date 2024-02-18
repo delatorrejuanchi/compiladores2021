@@ -1,0 +1,2 @@
+let id: Nat -> Nat = fun (x: Nat) -> x
+let ret : Nat = id 1
