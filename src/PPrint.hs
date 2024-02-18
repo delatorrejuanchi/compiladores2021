@@ -10,6 +10,7 @@ module PPrint
     ppTy,
     ppName,
     ppDecl,
+    ppNotFound,
   )
 where
 
@@ -213,3 +214,7 @@ ppDecl (Decl p x ty t) = do
           ]
           <+> nest 2 (t2doc False (openAll (map declName gdecl) t))
     )
+
+ppNotFound :: MonadFD4 m => Name -> m a
+ppNotFound nm = failFD4 $ "Error de ejecución: Variable no declarada: " ++ ppName nm
+

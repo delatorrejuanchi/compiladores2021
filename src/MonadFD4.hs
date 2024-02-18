@@ -15,7 +15,7 @@
 module MonadFD4
   ( FD4,
     runFD4,
-    lookupDecl,
+    maybeGetDecl,
     lookupTy,
     printFD4,
     setLastFile,
@@ -84,8 +84,8 @@ eraseLastFileDecls = do
 hasName :: Name -> Decl a b -> Bool
 hasName nm Decl {declName = nm'} = nm == nm'
 
-lookupDecl :: MonadFD4 m => Name -> m (Maybe Term)
-lookupDecl nm = do
+maybeGetDecl :: MonadFD4 m => Name -> m (Maybe Term)
+maybeGetDecl nm = do
   s <- get
   case filter (hasName nm) (glb s) of
     Decl {declBody = e} : _ -> return (Just e)

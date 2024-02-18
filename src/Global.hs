@@ -10,8 +10,8 @@ module Global where
 import Lang
 
 data GlEnv = GlEnv
-  { inter :: Bool, --  ^ True, si estamos en modo interactivo.
-
+  { -- | True, si estamos en modo interactivo.
+    inter :: Bool,
     -- | Último archivo cargado.
     lfile :: String,
     -- | Cantidad de declaraciones desde la última carga
