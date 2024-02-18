@@ -1,12 +1,5 @@
 {-# LANGUAGE TupleSections #-}
 
--- |
--- Module      : Optimize
--- Description : Define las optimizaciones del compilador.
--- Copyright   : (c) Juan Cruz de la Torre, Bautista Marelli, 2023.
--- License     : GPL-3
--- Maintainer  : none
--- Stability   : experimental
 module Optimize where
 
 import Eval (semOp)

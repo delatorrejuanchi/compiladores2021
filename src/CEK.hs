@@ -1,10 +1,3 @@
--- |
--- Module      : CEK
--- Description : Define una maquina abstracta CEK.
--- Copyright   : (c) Juan Cruz de la Torre, Bautista Marelli, 2023.
--- License     : GPL-3
--- Maintainer  : none
--- Stability   : experimental
 module CEK where
 
 import Common
