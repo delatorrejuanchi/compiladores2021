@@ -5,7 +5,7 @@ module Optimize where
 import Eval (semOp)
 import Lang
 import MonadFD4
-import Subst (subst, substN)
+import Subst (subst)
 
 (<.>) :: MonadFD4 m => (Term -> Term) -> (Term -> m (Term, Bool)) -> (Term -> m (Term, Bool))
 (f <.> g) term = do
@@ -50,7 +50,12 @@ recursiveOptimize (Let p n ty e t) = do
   (e', eChanged) <- optimize' e
   (t', tChanged) <- optimize' t
   return (Let p n ty e' t', eChanged || tChanged)
-recursiveOptimize term = return (term, False)
+recursiveOptimize (BinaryOp p op t u) = do
+  (t', tChanged) <- optimize' t
+  (u', uChanged) <- optimize' u
+  return (BinaryOp p op t' u', tChanged || uChanged)
+recursiveOptimize t@(Const _ _) = return (t, False)
+recursiveOptimize t@(V _ _) = return (t, False)
 
 -- Optimizaciones
 constantFolding :: MonadFD4 m => Term -> m (Term, Bool)
@@ -68,5 +73,4 @@ constantPropagation term = return (term, False)
 inlineExpansion :: Monad m => Term -> m (Term, Bool)
 inlineExpansion (Let _ _ _ e t) = return (subst e t, True)
 inlineExpansion (App _ (Lam _ _ _ b) t) = return (subst t b, True)
--- inlineExpansion (App _ ff@(Fix _ f _ _ _ b) t) = return (substN [ff, t] b, True)
 inlineExpansion term = return (term, False)
