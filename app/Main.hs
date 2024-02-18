@@ -10,7 +10,9 @@
 module Main where
 
 import Bytecompile (bcRead, bcWrite, bytecompile, runBC)
+import C
 import CEK (evalCEK)
+import ClosureConvert
 import Control.Exception (IOException, catch)
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.Trans
@@ -21,11 +23,14 @@ import Elab (elab, elabDecl)
 import Errors
 import Eval (eval)
 import Global (GlEnv (..))
+import IR
 import Lang
 import MonadFD4
+import Optimize (optimize, optimizeDecl)
 import Options.Applicative
-import PPrint (pp, ppDecl, ppTy)
+import PPrint (pp, ppTy)
 import Parse (P, declOrTm, program, runP, tm)
+import Subst
 import System.Console.Haskeline
   ( InputT,
     defaultSettings,
@@ -36,8 +41,6 @@ import System.Exit
 import System.FilePath (splitExtension)
 import System.IO (hPrint, hPutStrLn, stderr)
 import TypeChecker (tc, tcDecl)
-import Optimize (optimize, optimizeDecl)
-import Subst
 
 prompt :: String
 prompt = "FD4> "
@@ -51,8 +54,8 @@ data Mode
   | InteractiveCEK
   | Bytecompile
   | RunVM
+  | CC
 
--- | CC
 -- | Canon
 -- | LLVM
 -- | Build
@@ -66,7 +69,7 @@ parseMode =
             <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
             <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
             <|> flag Interactive Interactive (long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
-            -- <|> flag' CC ( long "cc" <> short 'c' <> help "Compilar a código C")
+            <|> flag' CC (long "cc" <> short 'c' <> help "Compilar a código C")
             -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
             -- <|> flag' LLVM ( long "llvm" <> short 'l' <> help "Imprimir LLVM resultante")
             -- <|> flag' Build ( long "build" <> short 'b' <> help "Compilar")
@@ -103,9 +106,9 @@ main = execParser opts >>= go
       runOrFail $ mapM_ (bytecompileFile opt) files
     go (RunVM, _, files) =
       runOrFail $ mapM_ bytecodeRun files
+    go (CC, _, files) =
+      runOrFail $ mapM_ ccFile files
 
--- go (CC,_, files) =
---           runOrFail $ mapM_ ccFile files
 -- go (Canon,_, files) =
 --           runOrFail $ mapM_ canonFile files
 -- go (LLVM,_, files) =
@@ -153,7 +156,6 @@ compileFiles opt (x : xs) = do
 
 loadFile :: MonadFD4 m => FilePath -> m [SDecl]
 loadFile f = do
-  printFD4 ("Abriendo " ++ f ++ "...")
   let filename = reverse (dropWhile isSpace (reverse f))
   x <-
     liftIO $
@@ -181,9 +183,7 @@ bytecompileFile :: MonadFD4 m => Bool -> FilePath -> m ()
 bytecompileFile opt f = do
   decls <- loadFile f
   decls' <- mapM elabDecl decls
-  mapM_ addDecl decls'
-  -- mapM_ tcDecl decls' -- FIXME: typecheck
-  pp (transform decls') >>= printFD4
+  mapM_ addTcDecl decls'
   t <- if opt then optimize (transform decls') else return (transform decls')
   bytecode <- bytecompile t
   liftIO $ bcWrite bytecode (fst (splitExtension f) ++ ".byte")
@@ -192,9 +192,27 @@ bytecompileFile opt f = do
     transform [] = error "No main function"
     transform [Decl _ _ _ t] = t
     transform (Decl p n ty t : ds) = Let p n ty t (close n (glob2free (transform ds)))
+    addTcDecl :: MonadFD4 m => DeclTerm -> m ()
+    addTcDecl decl = do
+      ty <- tcDecl decl
+      addTy (declName decl) ty
+      addDecl decl
 
 bytecodeRun :: MonadFD4 m => FilePath -> m ()
 bytecodeRun = liftIO . bcRead >=> runBC
+
+ccFile :: MonadFD4 m => FilePath -> m ()
+ccFile f = do
+  d <- loadFile f
+  d' <- mapM elabDecl d
+  mapM_ tcAddTy d'
+  let irdecls = runCC d'
+  liftIO $ writeFile (fst (splitExtension f) ++ ".c") (ir2C (IrDecls irdecls))
+  where
+    tcAddTy :: MonadFD4 m => DeclTerm -> m ()
+    tcAddTy decl = do
+      ty <- tcDecl decl
+      addTy (declName decl) ty
 
 parseIO :: MonadFD4 m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
@@ -208,7 +226,6 @@ handleDecl opt d = do
   d'' <- if opt then optimizeDecl d' else return d'
   addTy (declName d'') ty
   addDecl d''
-  ppDecl d'' >>= printFD4
 
 data Command
   = Compile CompileForm

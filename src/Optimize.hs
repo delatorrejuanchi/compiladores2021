@@ -1,12 +1,5 @@
 {-# LANGUAGE TupleSections #-}
 
--- |
--- Module      : Optimize
--- Description : Define las optimizaciones del compilador.
--- Copyright   : (c) Juan Cruz de la Torre, Bautista Marelli, 2023.
--- License     : GPL-3
--- Maintainer  : none
--- Stability   : experimental
 module Optimize where
 
 import Eval (semOp)
@@ -47,7 +40,7 @@ recursiveOptimize (App p u t) = do
   (t', tChanged) <- optimize' t
   return (App p u' t', uChanged || tChanged)
 recursiveOptimize (Print p s t) = (Print p s <.> optimize') t
-recursiveOptimize (Fix p n1 ty1 n2 ty2 t) = (Fix p n1 ty1 n2 ty2 <.> optimize') t
+recursiveOptimize (Fix p f fty x xty t) = (Fix p f fty x xty <.> optimize') t
 recursiveOptimize (IfZ p c t e) = do
   (c', cChanged) <- optimize' c
   (t', tChanged) <- optimize' t
