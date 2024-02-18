@@ -1,0 +1,1 @@
+let res : Nat = let f : Nat -> Nat = fun (x : Nat) -> x in f 10

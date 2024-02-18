@@ -1,3 +1,0 @@
-let f (x: Nat) : Nat = x
-
-let g (x: Nat) : Nat = f

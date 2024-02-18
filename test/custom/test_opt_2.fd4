@@ -1,6 +1,0 @@
-type N = Nat
-let a: N = 8
-let b: N = 5
-let suma (n m: N): N = n + m
-
-let res: N = suma a b

@@ -1,0 +1,3 @@
+let f (x y : Nat) (g : Nat -> Nat -> Nat) : Nat = g x y
+
+let res : Nat = let sum (x y : Nat) : Nat = x + y in f 10 20 sum
