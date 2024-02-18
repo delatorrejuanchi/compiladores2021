@@ -51,7 +51,8 @@ lexer =
             "in",
             "ifz",
             "print",
-            "Nat"
+            "Nat",
+            "type"
           ],
         reservedOpNames = ["->", ":", "=", "+", "-"]
       }
@@ -82,7 +83,7 @@ reservedOp = Tok.reservedOp lexer
 -----------------------
 
 typeP :: P STy
-typeP = oneOf [typeFun, typeAtom]
+typeP = oneOf [typeFun, typeAtom, typeSyn]
 
 typeFun :: P STy
 typeFun = SFunTy <$> typeAtom <*> (reservedOp "->" >> typeP)
@@ -92,6 +93,9 @@ typeAtom = oneOf [typeNat, parens typeP]
 
 typeNat :: P STy
 typeNat = reserved "Nat" >> return SNatTy
+
+typeSyn :: P STy
+typeSyn = STypeSyn <$> identifier
 
 num :: P Int
 num = fromInteger <$> natural
@@ -235,7 +239,7 @@ program :: P [SDecl]
 program = many decl
 
 decl :: P SDecl
-decl = oneOf [declfun, declrec, declvar]
+decl = oneOf [declfun, declrec, declvar, decltype]
 
 declfun :: P SDecl
 declfun = do
@@ -270,6 +274,15 @@ declvar = do
   reservedOp "="
   t <- expr
   return (SDeclVar i v ty t)
+
+decltype :: P SDecl
+decltype = do
+  i <- getPos
+  reserved "type"
+  n <- identifier
+  reservedOp "="
+  ty <- typeP
+  return (SDeclType i n ty)
 
 declOrTm :: P (Either SDecl SNTerm)
 declOrTm = oneOf [Left <$> decl <* eof, Right <$> expr <* eof]

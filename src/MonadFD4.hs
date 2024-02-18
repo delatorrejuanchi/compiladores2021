@@ -17,6 +17,7 @@ module MonadFD4
     runFD4,
     maybeGetDecl,
     lookupTy,
+    lookupTypeSynonym,
     printFD4,
     setLastFile,
     getLastFile,
@@ -25,6 +26,7 @@ module MonadFD4
     failFD4,
     addDecl,
     addTy,
+    addTypeSynonym,
     catchErrors,
     putCharFD4,
     MonadFD4,
@@ -75,6 +77,9 @@ addDecl d = modify (\s -> s {glb = d : glb s, cantDecl = cantDecl s + 1})
 addTy :: MonadFD4 m => Name -> Ty -> m ()
 addTy n ty = modify (\s -> s {tyEnv = (n, ty) : tyEnv s})
 
+addTypeSynonym :: MonadFD4 m => Name -> Ty -> m ()
+addTypeSynonym n ty = modify (\s -> s {typeSynonyms = (n, ty) : typeSynonyms s})
+
 eraseLastFileDecls :: MonadFD4 m => m ()
 eraseLastFileDecls = do
   s <- get
@@ -97,6 +102,9 @@ maybeGetDecl nm = do
 
 lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)
 lookupTy nm = gets (lookup nm . tyEnv)
+
+lookupTypeSynonym :: MonadFD4 m => Name -> m (Maybe Ty)
+lookupTypeSynonym nm = gets (lookup nm . typeSynonyms)
 
 failPosFD4 :: MonadFD4 m => Pos -> String -> m a
 failPosFD4 p s = throwError (ErrPos p s)

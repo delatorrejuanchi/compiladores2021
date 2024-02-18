@@ -1,5 +1,6 @@
-let a: Nat = 8
-let b: Nat = 5
-let suma (n m: Nat): Nat = n + m
+type N = Nat
+let a: N = 8
+let b: N = 5
+let suma (n m: N): N = n + m
 
-let res: Nat = suma a b
+let res: N = suma a b

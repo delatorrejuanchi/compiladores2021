@@ -67,6 +67,6 @@ constantPropagation term = return (term, False)
 
 inlineExpansion :: Monad m => Term -> m (Term, Bool)
 inlineExpansion (Let _ _ _ e t) = return (subst e t, True)
-inlineExpansion (App _ (Lam _ _ _ b) t) = return (subst b t, True)
+inlineExpansion (App _ (Lam _ _ _ b) t) = return (subst t b, True)
 -- inlineExpansion (App _ ff@(Fix _ f _ _ _ b) t) = return (substN [ff, t] b, True)
 inlineExpansion term = return (term, False)
