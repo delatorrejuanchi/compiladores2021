@@ -1,10 +1,3 @@
--- |
--- Module      : CEK
--- Description : Define una maquina abstracta CEK.
--- Copyright   : (c) Juan Cruz de la Torre, Bautista Marelli, 2023.
--- License     : GPL-3
--- Maintainer  : none
--- Stability   : experimental
 module CEK where
 
 import Common
@@ -42,11 +35,10 @@ search (IfZ _ c t e) p k = search c p (KIFz p t e : k)
 search (App _ t u) p k = search t p (KArg p u : k)
 search (V _ (Bound i)) p k = destroy (p !! i) k
 search (V _ (Free _)) p k = undefined
-search (V _ (Global nm)) p k = do
-  t <- maybeGetDecl nm
-  case t of
-    Just t' -> search t' p k
-    Nothing -> failFD4 $ "Error de ejecución: Variable no declarada: " ++ ppName nm
+search (V _ (Global nm)) p k =
+  maybeGetDecl nm >>= maybe (ppNotFound nm) (search' p k)
+  where
+    search' a b c = search c a b
 search (Const _ (CNat n)) p k = destroy (ValNum n) k
 search f@(Lam _ _ _ t) p k = destroy (ValClos (ClosFun p t f)) k
 search (Let _ _ _ t u) p k = search t p (KLet p u : k)

@@ -12,7 +12,7 @@ module Eval where
 import Common (abort)
 import Lang
 import MonadFD4 (MonadFD4, failFD4, maybeGetDecl, printFD4)
-import PPrint (ppName)
+import PPrint (ppName, ppNotFound)
 import Subst (subst, substN)
 
 -- | Semántica de operadores binarios
@@ -22,12 +22,7 @@ semOp Sub x y = max 0 (x - y)
 
 -- | Evaluador de términos CBV
 eval :: MonadFD4 m => Term -> m Term
-eval (V _ (Global nm)) = do
-  -- unfold and keep going
-  mtm <- maybeGetDecl nm
-  case mtm of
-    Nothing -> failFD4 $ "Error de ejecución: Variable no declarada: " ++ ppName nm
-    Just t -> eval t
+eval (V _ (Global nm)) = maybeGetDecl nm >>= maybe (ppNotFound nm) eval
 eval (App p l r) = do
   le <- eval l
   re <- eval r
