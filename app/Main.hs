@@ -28,7 +28,7 @@ import Lang
 import MonadFD4
 import Optimize (optimize, optimizeDecl)
 import Options.Applicative
-import PPrint (pp, ppTy)
+import PPrint (pp, ppTy, ppDecl)
 import Parse (P, declOrTm, program, runP, tm)
 import Subst
 import System.Console.Haskeline
@@ -177,7 +177,8 @@ compileFile opt f = do
 typecheckFile :: MonadFD4 m => Bool -> FilePath -> m ()
 typecheckFile opt f = do
   decls <- loadFile f
-  mapM_ (handleDecl opt) decls
+  decls' <- mapM (handleDecl opt) decls
+  mapM_ (printFD4 <=< ppDecl) (catMaybes decls')
 
 bytecompileFile :: MonadFD4 m => Bool -> FilePath -> m ()
 bytecompileFile opt f = do
@@ -221,16 +222,20 @@ parseIO filename p x = case runP p x filename of
   Left e -> throwError (ParseErr e)
   Right r -> return r
 
-handleDecl :: MonadFD4 m => Bool -> SDecl -> m ()
+handleDecl :: MonadFD4 m => Bool -> SDecl -> m (Maybe DeclTerm)
 handleDecl opt d = do
   md <- elabDecl d
   case md of
-    Nothing -> return ()
+    Nothing -> return Nothing
     Just d' -> do
       ty <- tcDecl d'
       d'' <- if opt then optimizeDecl d' else return d'
       addTy (declName d'') ty
       addDecl d''
+      return $ Just d''
+
+handleDecl_ :: MonadFD4 m => Bool -> SDecl -> m ()
+handleDecl_ opt d = void (handleDecl opt d)
 
 data Command
   = Compile CompileForm
@@ -330,7 +335,7 @@ compilePhrase x mode opt =
   do
     dot <- parseIO "<interactive>" declOrTm x
     case dot of
-      Left d -> handleDecl opt d
+      Left d -> handleDecl_ opt d
       Right t -> handleTerm t mode opt
 
 handleTerm :: MonadFD4 m => SNTerm -> Mode -> Bool -> m ()
