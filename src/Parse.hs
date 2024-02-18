@@ -151,7 +151,6 @@ printOp = do
   str <- option "" stringLiteral
   oneOf [SPrint i str <$> expr, return $ SPrintEta i str]
 
--- NOTE: app parsea un atom o la aplicación de varios atom.
 app :: P SNTerm
 app = do
   i <- getPos

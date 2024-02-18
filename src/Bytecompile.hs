@@ -110,7 +110,6 @@ bc (Lam _ _ _ t) = do
   t' <- bcT t
   return $ FUNCTION : length t' : t'
 bc (App _ t u) = do
-  -- NOTE: (\t u -> t ++ u ++ [CALL]) <$> bc t <*> bc u
   t' <- bc t
   u' <- bc u
   return $ t' ++ u' ++ [CALL]
