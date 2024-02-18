@@ -26,6 +26,7 @@ module MonadFD4
     addDecl,
     addTy,
     catchErrors,
+    putCharFD4,
     MonadFD4,
     module Control.Monad.Except,
     module Control.Monad.State,
@@ -55,6 +56,9 @@ import System.IO
 -- y otras operaciones derivadas de ellas, como por ejemplo
 --   - @modify :: (GlEnv -> GlEnv) -> m ()
 class (MonadIO m, MonadState GlEnv m, MonadError Error m) => MonadFD4 m
+
+putCharFD4 :: MonadFD4 m => Char -> m ()
+putCharFD4 = liftIO . putChar
 
 printFD4 :: MonadFD4 m => String -> m ()
 printFD4 = liftIO . putStrLn

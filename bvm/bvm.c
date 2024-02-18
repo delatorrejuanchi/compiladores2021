@@ -15,52 +15,54 @@
 #define FAST 1
 #define TRACE 0
 
-#define quit(...)							\
-	do {								\
-		fprintf(stderr, __VA_ARGS__);				\
-		fprintf(stderr, "\n");					\
-		fprintf(stderr, "errno = %d\n", errno);			\
-		exit(1);						\
+#define quit(...)                           \
+	do                                        \
+	{                                         \
+		fprintf(stderr, __VA_ARGS__);           \
+		fprintf(stderr, "\n");                  \
+		fprintf(stderr, "errno = %d\n", errno); \
+		exit(1);                                \
 	} while (0)
 
 #if TRACE && !FAST
- #define _trace(...)							\
-	do {								\
-		fprintf(stderr, "TRACE: ");				\
-		fprintf(stderr, __VA_ARGS__);				\
-		fprintf(stderr, "\n");					\
+#define _trace(...)               \
+	do                              \
+	{                               \
+		fprintf(stderr, "TRACE: ");   \
+		fprintf(stderr, __VA_ARGS__); \
+		fprintf(stderr, "\n");        \
 	} while (0)
 #else
- #define _trace(s, ...)
+#define _trace(s, ...)
 #endif
 
 #if FAST
- #undef assert
- #define assert(x)
- #define IF_FAST(x) x
- #define IF_SLOW(x)
+#undef assert
+#define assert(x)
+#define IF_FAST(x) x
+#define IF_SLOW(x)
 #else
- #undef NDEBUG
- #define IF_FAST(x)
- #define IF_SLOW(x) x
+#undef NDEBUG
+#define IF_FAST(x)
+#define IF_SLOW(x) x
 #endif
 #define SLOW !FAST
 
-#define RETURN   1
-#define CONST    2
-#define ACCESS   3
+#define RETURN 1
+#define CONST 2
+#define ACCESS 3
 #define FUNCTION 4
-#define CALL     5
-#define ADD      6
-#define SUB      7
-#define IFZ      8
-#define FIX      9
-#define STOP     10
-#define SHIFT    11
-#define DROP     12
-#define PRINT    13
-#define PRINTN   14
-#define JUMP     15
+#define CALL 5
+#define ADD 6
+#define SUB 7
+#define IFZ 8
+#define FIX 9
+#define STOP 10
+#define SHIFT 11
+#define DROP 12
+#define PRINT 13
+#define PRINTN 14
+#define JUMP 15
 #define TAILCALL 16
 
 #define CHUNK 4096
@@ -83,8 +85,9 @@ typedef struct env *env;
  * Una clausura: un par compuesto de un entorno y un cuerpo, que es
  * simplemente un puntero a código, es decir simplemente una etiqueta.
  */
-struct clo {
-	env  clo_env;
+struct clo
+{
+	env clo_env;
 	code clo_body;
 };
 
@@ -94,7 +97,8 @@ struct clo {
  * bien tipado, y usa el dato que espera tener. No se hace ningún tipo
  * de chequeo en runtime.
  */
-union value {
+union value
+{
 	uint32_t i;
 	struct clo clo;
 };
@@ -105,7 +109,8 @@ typedef union value value;
  * entre las clausuras y los entornos: un entorno es una lista de
  * valores, que pueden ser clausuras; y cada clausura tiene un entorno.
  */
-struct env {
+struct env
+{
 	value v;
 	struct env *next;
 };
@@ -128,7 +133,8 @@ static inline env env_push(env e, value v)
 static int env_len(env e)
 {
 	int rc = 0;
-	while (e) {
+	while (e)
+	{
 		e = e->next;
 		rc++;
 	}
@@ -175,15 +181,17 @@ void run(code init_c)
 	 * Que es igual a s = s - 1; v = *s
 	 */
 
-	while (1) {
+	while (1)
+	{
 		/*
 		 * Agrandamos la pila si estamos cerca (a 10 elementos) de
 		 * llenarla. Le agregamos otro bloque de CHUNK valores al final.
 		 */
-		if (s - stack > stack_size - 10) {
+		if (s - stack > stack_size - 10)
+		{
 			int offset = s - stack;
 			stack_size += CHUNK;
-			value *new = GC_realloc (stack, stack_size * sizeof stack[0]);
+			value *new = GC_realloc(stack, stack_size * sizeof stack[0]);
 			if (!new)
 				quit("OOM stack grow");
 			stack = new;
@@ -192,23 +200,27 @@ void run(code init_c)
 
 		/* Tracing: sólo habilitado cuando compilamos
 		 * en modo lento. */
-		if (TRACE && !FAST) {
+		if (TRACE && !FAST)
+		{
 			code cc;
 			printf("codes = [");
-			for (cc = c; *cc != STOP; cc++) {
+			for (cc = c; *cc != STOP; cc++)
+			{
 				printf("%2i ", *cc);
 			}
 			printf(" 10]\n");
 		}
-		_trace("c = %p", (void*)c);
+		_trace("c = %p", (void *)c);
 		_trace("*c = %d", *c);
 		_trace("|s| = %ld", s - stack);
 		_trace("|e| = %d", env_len(e));
 
 		/* Consumimos un opcode y lo inspeccionamos. A la vez,
 		 * avanzamos el puntero de código. */
-		switch(*c++) {
-		case ACCESS: {
+		switch (*c++)
+		{
+		case ACCESS:
+		{
 			/* Acceso a una variable: leemos el entero
 			 * siguiente que representa el índice y recorremos
 			 * el entorno hasta llegar a su binding. */
@@ -222,31 +234,35 @@ void run(code init_c)
 			break;
 		}
 
-		case CONST: {
+		case CONST:
+		{
 			/* Una constante: la leemos y la ponemos en la pila */
 			(*s++).i = *c++;
 			break;
 		}
 
-		case ADD: {
+		case ADD:
+		{
 			/* Suma: ya tenemos los valores en el tope de la pila,
-			   la sumamos y la volvemos a poner en la pila */
+				 la sumamos y la volvemos a poner en la pila */
 			uint32_t y = (*--s).i;
 			uint32_t x = (*--s).i;
-			(*s++).i = x+y;
+			(*s++).i = x + y;
 			break;
 		}
 
-  		case SUB: {
+		case SUB:
+		{
 			/* resta: ya tenemos los valores en el tope de la pila,
-			   hacemos la resta solo si x > y, sino es 0. */
+				 hacemos la resta solo si x > y, sino es 0. */
 			uint32_t y = (*--s).i;
 			uint32_t x = (*--s).i;
-			(*s++).i = x > y ? x-y : 0;
+			(*s++).i = x > y ? x - y : 0;
 			break;
 		}
 
-		case RETURN: {
+		case RETURN:
+		{
 			/* Return: tenemos en la pila un valor y una dirección,
 			 * y entorno, de retorno. Saltamos a la dirección
 			 * de retorno y a su entorno, pero dejamos el valor
@@ -262,7 +278,8 @@ void run(code init_c)
 			break;
 		}
 
-		case CALL: {
+		case CALL:
+		{
 			/* Aplicación: tenemos en la pila un argumento
 			 * y una función. La función debe ser una clausura.
 			 * La idea es saltar a la clausura extendiendo su
@@ -272,7 +289,7 @@ void run(code init_c)
 			value arg = *--s;
 			value fun = *--s;
 
-			struct clo ret_addr = { .clo_env = e, .clo_body = c };
+			struct clo ret_addr = {.clo_env = e, .clo_body = c};
 			(*s++).clo = ret_addr;
 
 			/* Cambiamos al entorno de la clausura, agregando arg */
@@ -284,22 +301,36 @@ void run(code init_c)
 			break;
 		}
 
-/*
-		case TAILCALL: {
-		}
-*/
-		case IFZ: {
-			quit("IFZ no implementado");
+		case TAILCALL:
+		{
+			value v = *--s;
+			struct clo clo = (*--s).clo;
+
+			e = env_push(clo.clo_env, v);
+			c = clo.clo_body;
+
 			break;
-        }
-        
-		case JUMP: {
+		}
+
+		case IFZ:
+		{
+			int skiptrue = *c++;
+			uint32_t cond = (*--s).i;
+			if (cond != 0)
+				c += skiptrue;
+
+			break;
+		}
+
+		case JUMP:
+		{
 			int offset = *c++;
 			c += offset;
 			break;
 		}
 
-		case FUNCTION: {
+		case FUNCTION:
+		{
 			/* Un lambda, es un valor! Armamos una clausura
 			 * la ponemos en la pila, y listo! */
 
@@ -314,8 +345,8 @@ void run(code init_c)
 
 			/* Ahora sí, armamos la clausura */
 			struct clo clo = {
-				.clo_env = e,
-				.clo_body = c,
+					.clo_env = e,
+					.clo_body = c,
 			};
 
 			/* La ponemos en la pila */
@@ -327,7 +358,8 @@ void run(code init_c)
 			break;
 		}
 
-		case FIX: {
+		case FIX:
+		{
 			/*
 			 * Fixpoint: algo de magia. Tenemos una clausura en
 			 * la pila, donde su primer variable libre es el
@@ -347,38 +379,44 @@ void run(code init_c)
 			break;
 		}
 
-		case STOP: {
+		case STOP:
+		{
 			return;
 		}
 
-		case SHIFT: {
+		case SHIFT:
+		{
 			value v = *--s;
 			e = env_push(e, v);
 			break;
 		}
 
-		case DROP: {
+		case DROP:
+		{
 			e = e->next;
 			break;
 		}
 
-		case PRINTN: {
+		case PRINTN:
+		{
 			uint32_t i = s[-1].i;
 			wprintf(L"%" PRIu32 "\n", i);
 			break;
 		}
 
-		case PRINT: {
-		  	while(*c) {
-		   		wchar_t x = *c++;
-		   		putwchar(x);
-		  	}
-		  	c++;
-		  	break;
+		case PRINT:
+		{
+			while (*c)
+			{
+				wchar_t x = *c++;
+				putwchar(x);
+			}
+			c++;
+			break;
 		}
 
 		default:
-			quit("FATAL: unhandled op code, %d", *(c-1));
+			quit("FATAL: unhandled op code, %d", *(c - 1));
 		}
 	}
 }
@@ -398,7 +436,7 @@ int main(int argc, char **argv)
 	int fd;
 	struct stat sb;
 
-	setlocale(LC_ALL,"");
+	setlocale(LC_ALL, "");
 
 	if (argc < 2)
 		quit("I need a filename");

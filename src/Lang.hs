@@ -133,3 +133,15 @@ freeVars tm = nubSort $ go tm []
     go (IfZ _ c t e) xs = go c $ go t $ go e xs
     go (Const _ _) xs = xs
     go (Let _ _ _ e t) xs = go e (go t xs)
+
+glob2free :: Tm info Var ty -> Tm info Var ty
+glob2free (V i (Global n)) = V i (Free n)
+glob2free (V i v) = V i v
+glob2free (Const i c) = Const i c
+glob2free (Lam i x ty t) = Lam i x ty (glob2free t)
+glob2free (App i t u) = App i (glob2free t) (glob2free u)
+glob2free (Print i str t) = Print i str (glob2free t)
+glob2free (BinaryOp i op t u) = BinaryOp i op (glob2free t) (glob2free u)
+glob2free (Fix i f fty x xty t) = Fix i f fty x xty (glob2free t)
+glob2free (IfZ i c t e) = IfZ i (glob2free c) (glob2free t) (glob2free e)
+glob2free (Let i x xty e t) = Let i x xty (glob2free e) (glob2free t)
