@@ -30,7 +30,7 @@ eval (App p l r) = do
     (Lam _ y _ m, n) ->
       eval (subst n m)
     (ff@(Fix _ f _ _ _ t), n) ->
-      eval (substN [ff, n] t)
+      eval (substN [n, ff] t)
     _ ->
       abort ("Error de tipo en runtime " ++ show (le, re))
 eval (Print p str t) = do

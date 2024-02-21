@@ -58,16 +58,15 @@ closeN ns = varChanger lcl (\_ p i -> V p (Bound i))
               Nothing -> V p (Free y)
          nsr = reverse ns
 
--- `substN [tn,..,t0] t` sustituye los índices de de Bruijn en t con
--- los términos de la lista. Bound 0 pasa a t0, etc. Notar el orden
--- inverso para hacer las llamadas más intuitivas.
+-- `substN [t0,..,tn] t` sustituye los índices de de Bruijn en t con
+-- los términos de la lista. Bound 0 pasa a t0, etc.
 --
 -- El término `t` debe tener a lo sumo tantos índices abiertos como la
 -- longitud de la lista. Si es localmente cerrado (es decir que no tiene
 -- índices abiertos), nada va a ser sustituido.
 --
 -- Puede pensarse como una optimizacíon de primero hacer `open
--- [nn,..,n0] t`, con nombres frescos, y luego sustituir los nombres
+-- [n0,...,nn] t`, con nombres frescos, y luego sustituir los nombres
 -- por los términos correspondientes. La ventaja es que no hace falta
 -- generar ningún nombre, y por lo tanto evitamos la necesidad de
 -- nombres frescos.
@@ -76,10 +75,9 @@ substN ns = varChanger (\_ p n -> V p (Free n)) bnd
    where bnd depth p i
              | i <  depth = V p (Bound i)
              | i >= depth && i < depth + nns
-                = nsr !! (i - depth)
+                = ns !! (i - depth)
              | otherwise = abort "substN: M is not LC"
          nns = length ns
-         nsr = reverse ns
 
 -- Algunas definiciones auxiliares:
 
