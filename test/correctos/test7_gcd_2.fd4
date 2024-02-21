@@ -1,5 +1,6 @@
+type N = Nat
 
-let rec gcd(n m : Nat):Nat =  ifz n then m else 
+let rec gcd(n m : N):Nat =  ifz n then m else 
                             ifz m then n else 
                             ifz (n - m) then gcd (m - n) n else gcd m (n - m)
 

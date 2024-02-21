@@ -1,0 +1,12 @@
+type Bool = Nat
+
+let true: Bool = 0
+let false: Bool = 1
+
+# Operaciones
+let not (p: Bool): Bool = ifz p then false else true
+let and (p q: Bool): Bool = ifz p then q else false
+let or (p q: Bool): Bool = ifz p then true else q
+
+# Ejemplo
+let res: Bool = and true (not (or false (not (not true))))
