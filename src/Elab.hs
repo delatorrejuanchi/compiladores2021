@@ -45,11 +45,11 @@ desugarType (SFunTy ty1 ty2) = do
   ty1' <- desugarType ty1
   ty2' <- desugarType ty2
   return $ FunTy ty1' ty2'
-desugarType (STypeSyn name) = do
+desugarType (STypeSyn i name) = do
   mty <- lookupTypeSynonym name
   case mty of
     Just ty -> return ty
-    Nothing -> failFD4 $ "Type " ++ name ++ " not found"
+    Nothing -> failPosFD4 i $ "Type " ++ name ++ " not found"
 
 elab :: MonadFD4 m => SNTerm -> m Term
 elab t = elab' [] <$> traverse desugarType (transform t)

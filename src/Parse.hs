@@ -95,7 +95,9 @@ typeNat :: P STy
 typeNat = reserved "Nat" >> return SNatTy
 
 typeSyn :: P STy
-typeSyn = STypeSyn <$> identifier
+typeSyn = do
+  pos <- getPos
+  STypeSyn pos <$> identifier
 
 num :: P Int
 num = fromInteger <$> natural
