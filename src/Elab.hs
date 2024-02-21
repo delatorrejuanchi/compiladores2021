@@ -58,7 +58,7 @@ elab' :: [Name] -> NTerm -> Term
 elab' _ (Const p c) = Const p c
 elab' env (V p v) = if v `elem` env then V p (Free v) else V p (Global v)
 elab' env (Lam p v ty t) = Lam p v ty (close v (elab' (v : env) t))
-elab' env (Fix p f fty x xty t) = Fix p f fty x xty (closeN [f, x] (elab' (x : f : env) t))
+elab' env (Fix p f fty x xty t) = Fix p f fty x xty (closeN [x, f] (elab' (x : f : env) t))
 elab' env (IfZ p c t e) = IfZ p (elab' env c) (elab' env t) (elab' env e)
 elab' env (Print i str t) = Print i str (elab' env t)
 elab' env (BinaryOp i o t u) = BinaryOp i o (elab' env t) (elab' env u)

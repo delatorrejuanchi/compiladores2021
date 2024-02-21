@@ -50,7 +50,7 @@ tc (Fix p f fty x xty t) bs = do
       p
       "El tipo del argumento de un fixpoint debe coincidir con el \
       \dominio del tipo de la función"
-  let t' = openN [f, x] t
+  let t' = openN [x, f] t
   ty' <- tc t' ((x, xty) : (f, fty) : bs)
   expect cod ty' t'
   return fty

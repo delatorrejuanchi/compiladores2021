@@ -54,7 +54,7 @@ openAll ns (App p t u) = App p (openAll ns t) (openAll ns u)
 openAll ns (Fix p f fty x xty t) =
   let x' = freshen ns x
       f' = freshen (x' : ns) f
-   in Fix p f' fty x' xty (openAll (x : f : ns) (openN [f', x'] t))
+   in Fix p f' fty x' xty (openAll (x : f : ns) (openN [x', f'] t))
 openAll ns (IfZ p c t e) = IfZ p (openAll ns c) (openAll ns t) (openAll ns e)
 openAll ns (Print p str t) = Print p str (openAll ns t)
 openAll ns (BinaryOp p op t u) = BinaryOp p op (openAll ns t) (openAll ns u)
