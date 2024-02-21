@@ -7,6 +7,7 @@
 -- Stability   : experimental
 module PPrint
   ( pp,
+    ppDull,
     ppTy,
     ppName,
     ppDecl,
@@ -195,6 +196,11 @@ pp :: MonadFD4 m => Term -> m String
 pp t = do
   gdecl <- gets glb
   return (render . t2doc False $ openAll (map declName gdecl) t)
+
+ppDull :: MonadFD4 m => Term -> m String
+ppDull t = do
+  gdecl <- gets glb
+  return (render . unAnnotate . t2doc False $ openAll (map declName gdecl) t)
 
 render :: Doc AnsiStyle -> String
 render = unpack . renderStrict . layoutSmart defaultLayoutOptions

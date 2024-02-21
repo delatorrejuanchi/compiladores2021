@@ -28,7 +28,7 @@ import Lang
 import MonadFD4
 import Optimize (optimize, optimizeDecl)
 import Options.Applicative
-import PPrint (pp, ppTy, ppDecl)
+import PPrint (pp, ppTy, ppDecl, ppDull)
 import Parse (P, declOrTm, program, runP, tm)
 import Subst
 import System.Console.Haskeline
@@ -50,11 +50,14 @@ prompt = "FD4> "
 -}
 data Mode
   = Interactive
+  | Run
   | Typecheck
   | InteractiveCEK
+  | RunCEK
   | Bytecompile
   | RunVM
   | CC
+  deriving (Eq)
 
 -- | Canon
 -- | LLVM
@@ -66,9 +69,11 @@ parseMode =
   (,)
     <$> ( flag' Typecheck (long "typecheck" <> short 't' <> help "Chequear tipos e imprimir el término")
             <|> flag' InteractiveCEK (long "interactiveCEK" <> short 'k' <> help "Ejecutar interactivamente en la CEK")
+            <|> flag' RunCEK (long "runCEK" <> help "Ejecutar en la CEK. Requiere una variable res definida en el archivo.")
             <|> flag' Bytecompile (long "bytecompile" <> short 'm' <> help "Compilar a la BVM")
             <|> flag' RunVM (long "runVM" <> short 'r' <> help "Ejecutar bytecode en la BVM")
             <|> flag Interactive Interactive (long "interactive" <> short 'i' <> help "Ejecutar en forma interactiva")
+            <|> flag' Run (long "run" <> help "Ejecutar. Requiere una variable res definida en el archivo.")
             <|> flag' CC (long "cc" <> short 'c' <> help "Compilar a código C")
             -- <|> flag' Canon ( long "canon" <> short 'n' <> help "Imprimir canonicalización")
             -- <|> flag' LLVM ( long "llvm" <> short 'l' <> help "Imprimir LLVM resultante")
@@ -96,11 +101,19 @@ main = execParser opts >>= go
       do
         runFD4 (runInputT defaultSettings (repl files Interactive opt))
         return ()
+    go (Run, opt, files) =
+      do
+        runFD4 $ compileAndRun files Run opt
+        return ()
     go (Typecheck, opt, files) =
       runOrFail $ mapM_ (typecheckFile opt) files
     go (InteractiveCEK, opt, files) =
       do
         runFD4 (runInputT defaultSettings (repl files InteractiveCEK opt))
+        return ()
+    go (RunCEK, opt, files) =
+      do
+        runFD4 $ compileAndRun files RunCEK opt
         return ()
     go (Bytecompile, opt, files) =
       runOrFail $ mapM_ (bytecompileFile opt) files
@@ -115,6 +128,14 @@ main = execParser opts >>= go
 --           runOrFail $ mapM_ llvmFile files
 -- go (Build,_, files) =
 --           runOrFail $ mapM_ buildFile files
+
+compileAndRun :: MonadFD4 m => [FilePath] -> Mode -> Bool -> m ()
+compileAndRun files mode opt = do
+  compileFiles opt files
+  mDecl <- getLastDecl
+  case mDecl of
+    Nothing -> return ()
+    Just (Decl _ _ _ t) -> handleTerm t mode opt
 
 runOrFail :: FD4 a -> IO a
 runOrFail m = do
@@ -172,12 +193,12 @@ loadFile f = do
 compileFile :: MonadFD4 m => Bool -> FilePath -> m ()
 compileFile opt f = do
   decls <- loadFile f
-  mapM_ (handleDecl opt) decls
+  mapM_ (handleSDecl opt) decls
 
 typecheckFile :: MonadFD4 m => Bool -> FilePath -> m ()
 typecheckFile opt f = do
   decls <- loadFile f
-  decls' <- mapM (handleDecl opt) decls
+  decls' <- mapM (handleSDecl opt) decls
   mapM_ (printFD4 <=< ppDecl) (catMaybes decls')
 
 bytecompileFile :: MonadFD4 m => Bool -> FilePath -> m ()
@@ -222,8 +243,8 @@ parseIO filename p x = case runP p x filename of
   Left e -> throwError (ParseErr e)
   Right r -> return r
 
-handleDecl :: MonadFD4 m => Bool -> SDecl -> m (Maybe DeclTerm)
-handleDecl opt d = do
+handleSDecl :: MonadFD4 m => Bool -> SDecl -> m (Maybe DeclTerm)
+handleSDecl opt d = do
   md <- elabDecl d
   case md of
     Nothing -> return Nothing
@@ -234,8 +255,8 @@ handleDecl opt d = do
       addDecl d''
       return $ Just d''
 
-handleDecl_ :: MonadFD4 m => Bool -> SDecl -> m ()
-handleDecl_ opt d = void (handleDecl opt d)
+handleSDecl_ :: MonadFD4 m => Bool -> SDecl -> m ()
+handleSDecl_ opt d = void (handleSDecl opt d)
 
 data Command
   = Compile CompileForm
@@ -335,23 +356,37 @@ compilePhrase x mode opt =
   do
     dot <- parseIO "<interactive>" declOrTm x
     case dot of
-      Left d -> handleDecl_ opt d
-      Right t -> handleTerm t mode opt
+      Left d -> handleSDecl_ opt d
+      Right t -> handleSNTerm t mode opt
 
-handleTerm :: MonadFD4 m => SNTerm -> Mode -> Bool -> m ()
-handleTerm t mode opt = do
+handleSNTerm :: MonadFD4 m => SNTerm -> Mode -> Bool -> m ()
+handleSNTerm t mode opt = do
   t' <- elab t
+  handleTerm t' mode opt
+
+handleTerm :: MonadFD4 m => Term -> Mode -> Bool -> m ()
+handleTerm t mode opt = do
   s <- get
-  ty <- tc t' (tyEnv s)
-  t'' <- if opt then optimize t' else return t'
-  te <- evalTerm mode t''
-  ppte <- pp te
-  printFD4 (ppte ++ " : " ++ ppTy ty)
+  ty <- tc t (tyEnv s)
+  t' <- if opt then optimize t else return t
+  te <- evalTerm mode t'
+  displayResult mode te ty
   where
     evalTerm :: MonadFD4 m => Mode -> Term -> m Term
     evalTerm Interactive = eval
+    evalTerm Run = eval
     evalTerm InteractiveCEK = evalCEK
-    evalTerm _ = eval
+    evalTerm RunCEK = evalCEK
+    evalTerm _ = undefined
+
+    displayResult :: MonadFD4 m => Mode -> Term -> Ty -> m ()
+    displayResult m te ty | m == Run || m == RunCEK = do
+      ppte <- ppDull te
+      printFD4 ppte
+    displayResult m te ty | m == Interactive || m == InteractiveCEK = do
+      ppte <- pp te
+      printFD4 $ ppte ++ " : " ++ ppTy ty
+    displayResult _ _ _ = undefined
 
 printPhrase :: MonadFD4 m => String -> m ()
 printPhrase phrase =

@@ -62,6 +62,30 @@ executables:
     - compiladores
 
 tests:
+  # Run Test Suite
+  Run:
+    main: Run.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is Run
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
+  # RunCEK Test Suite
+  RunCEK:
+    main: RunCEK.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is RunCEK
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
   # Bytecode Test Suite
   Bytecode:
     main: Byte.hs
