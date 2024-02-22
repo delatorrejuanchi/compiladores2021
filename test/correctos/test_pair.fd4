@@ -1,0 +1,15 @@
+# Implementacion de pares en FD4
+
+type Bool = Nat
+let true : Bool = 0
+let false : Bool = 1
+let ifthenelse (b: Bool)(t f: Nat): Nat = ifz b then t else f
+
+type Pair = Bool -> Nat
+
+let pair (x y: Nat)(p: Bool): Nat = ifthenelse p x y
+let fst (p: Pair): Nat = p true
+let snd (p: Pair): Nat = p false
+
+let pair1: Pair = pair 1 2
+let res: Nat = snd pair1

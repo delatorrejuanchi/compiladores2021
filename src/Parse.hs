@@ -89,7 +89,7 @@ typeFun :: P STy
 typeFun = SFunTy <$> typeAtom <*> (reservedOp "->" >> typeP)
 
 typeAtom :: P STy
-typeAtom = oneOf [typeNat, parens typeP]
+typeAtom = oneOf [typeNat, typeSyn, parens typeP]
 
 typeNat :: P STy
 typeNat = reserved "Nat" >> return SNatTy
