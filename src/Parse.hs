@@ -83,7 +83,7 @@ reservedOp = Tok.reservedOp lexer
 -----------------------
 
 typeP :: P STy
-typeP = oneOf [typeFun, typeAtom, typeSyn]
+typeP = oneOf [typeFun, typeAtom]
 
 typeFun :: P STy
 typeFun = SFunTy <$> typeAtom <*> (reservedOp "->" >> typeP)
@@ -95,9 +95,7 @@ typeNat :: P STy
 typeNat = reserved "Nat" >> return SNatTy
 
 typeSyn :: P STy
-typeSyn = do
-  pos <- getPos
-  STypeSyn pos <$> identifier
+typeSyn = STypeSyn <$> identifier
 
 num :: P Int
 num = fromInteger <$> natural
