@@ -64,7 +64,7 @@ data Tm info var ty
 data STy
   = SNatTy
   | SFunTy STy STy
-  | STypeSyn Pos Name
+  | STypeSyn Name
   deriving (Show, Eq)
 
 data SNTerm

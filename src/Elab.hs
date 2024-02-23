@@ -13,8 +13,8 @@ module Elab (elab, elabDecl) where
 import Common (Pos)
 import Data.List.NonEmpty (head, tail)
 import Lang
-import MonadFD4 (MonadFD4, lookupTypeSynonym, addTypeSynonym, failFD4, failPosFD4)
-import Subst
+import MonadFD4 (MonadFD4, lookupTypeSynonym, addTypeSynonym, failPosFD4)
+import Subst ( closeN, close )
 
 buildFunTy :: Binders -> STy -> STy
 buildFunTy bs rty = foldr (\(_, xty) acc -> SFunTy xty acc) rty bs
@@ -39,20 +39,20 @@ transform (SPrintEta i str) = Lam i "x" SNatTy (Print i str (V i "x"))
 transform (SLetFun i f bs rty def body) = Let i f (buildFunTy bs rty) (buildFun i bs $ transform def) (transform body)
 transform (SLetRec i f bs rty def body) = Let i f (buildFunTy bs rty) (buildRecFun i f bs rty $ transform def) (transform body)
 
-desugarType :: MonadFD4 m => STy -> m Ty
-desugarType SNatTy = return NatTy
-desugarType (SFunTy ty1 ty2) = do
-  ty1' <- desugarType ty1
-  ty2' <- desugarType ty2
+desugarType :: MonadFD4 m => Pos -> STy -> m Ty
+desugarType _ SNatTy = return NatTy
+desugarType i (SFunTy ty1 ty2) = do
+  ty1' <- desugarType i ty1
+  ty2' <- desugarType i ty2
   return $ FunTy ty1' ty2'
-desugarType (STypeSyn i name) = do
+desugarType i (STypeSyn name) = do
   mty <- lookupTypeSynonym name
   case mty of
     Just ty -> return ty
     Nothing -> failPosFD4 i $ "Type " ++ name ++ " not found"
 
 elab :: MonadFD4 m => SNTerm -> m Term
-elab t = elab' [] <$> traverse desugarType (transform t)
+elab t = let t' = transform t in elab' [] <$> traverse (desugarType $ getInfo t') t'
 
 elab' :: [Name] -> NTerm -> Term
 elab' _ (Const p c) = Const p c
@@ -74,12 +74,16 @@ transformDecl (SDeclType i name ty) = do
   case mty of
     Just _ -> failPosFD4 i $ "Type synonym " ++ name ++ " already exists"
     Nothing -> do
-      ty' <- desugarType ty
+      ty' <- desugarType i ty
       addTypeSynonym name ty'
       return Nothing
 
 elabDecl :: MonadFD4 m => SDecl -> m (Maybe DeclTerm)
-elabDecl d = transformDecl d >>= traverse (fmap elabDecl' . traverse desugarType)
+elabDecl d = do
+  d' <- transformDecl d
+  mapM
+    (fmap elabDecl')
+    (fmap (traverse . desugarType) (declPos <$> d') <*> d')
 
 elabDecl' :: DeclNTerm -> DeclTerm
 elabDecl' (Decl p v ty t) = Decl p v ty (elab' [] t)
