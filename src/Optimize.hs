@@ -15,8 +15,9 @@ import Subst (subst)
 (<||>) :: MonadFD4 m => (Term -> m (Term, Bool)) -> (Term -> m (Term, Bool)) -> (Term -> m (Term, Bool))
 (f <||> g) term = do
   (fterm, fchanged) <- f term
-  (gfterm, gchanged) <- g fterm
-  return (gfterm, fchanged || gchanged)
+  if fchanged
+    then return (fterm, True)
+    else g term
 
 optimizeDecl :: MonadFD4 m => DeclTerm -> m DeclTerm
 optimizeDecl (Decl p n ty t) = Decl p n ty <$> optimize t
