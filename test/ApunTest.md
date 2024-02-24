@@ -1,5 +1,5 @@
 Para poner a prueba a el compilador utilizaremos una técnica denominada
-*Test de Caja Negra*. Es decir, traremos al compilador como una función
+*Test de Caja Negra*. Es decir, trataremos al compilador como una función
 de la cual no conocemos su implementación, y por lo que, lo trataremos
 como una función `comp` que a dado un código fuente `A` nos retorna un
 binario `comp = BA` como resultado. Ejecutaremos el binario resultante,
@@ -23,11 +23,51 @@ Para sumar nuestra bateria de pruebas al proyecto de
 es definir un nuevo modulo indicando cual será el archivo de cabecera
 que se ejecutará para cada uno de los modos del compilador.
 
-A modo de ejemplo podemos ver como se pueden lanzar las pruebas de
-`Bytecode`:
+Definimos Test Suites:
+- `Run`: para pruebas sobre el modo de ejecución original.
+- `RunOptimized`: para pruebas sobre el modo de ejecución original con optimizaciones.
+- `RunCEK`: para pruebas sobre el modo de ejecución usando la máquina CEK.
+- `Bytecode`: para pruebas sobre el modo de ejecución usando bytecode.
+- `C`: para pruebas sobre el modo de ejecución mediante compilación a C.
 
 ``` yaml
 tests:
+  # Run Test Suite
+  Run:
+    main: Run.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is Run
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
+  # RunOptimized Test Suite
+  RunOptimized:
+    main: RunOptimized.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is RunOptimized
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
+  # RunCEK Test Suite
+  RunCEK:
+    main: RunCEK.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is RunCEK
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
   # Bytecode Test Suite
   Bytecode:
     main: Byte.hs
@@ -40,7 +80,7 @@ tests:
     dependencies:
       - compiladores
       - HTF
-  # Virtual Machine Test Suite
+  # C Backend Test Suite
   C:
     main: C.hs
     source-dirs: test
@@ -54,10 +94,10 @@ tests:
       - HTF
 ```
 
-Los archivos `VM.hs, Byte.hs` estarán ubicados en una nueva carpeta
-`test`, mientras que los casos de prueba estarán en `test/testCases/`
-Esto nos permite lanzar las diferentes baterías de prueba desde la
-terminal de la siguiente forma:
+Los archivos `Run.hs, RunOptimized.hs, RunCEK.hs, C.hs, Byte.hs` estarán
+ubicados en una nueva carpeta `test`, mientras que los casos de prueba
+estarán en `test/correctos/` Esto nos permite lanzar las diferentes
+baterías de prueba desde la terminal de la siguiente forma:
 
 -   Para probar la compilación a *Bytecode*
 
@@ -75,6 +115,8 @@ terminal de la siguiente forma:
     script `compile_and_run_c.sh` que pueden encontrar en la carpeta
     *Test*.
 
+NOTA: en algunos entornos, es posible que deban pasarse las opciones "--ghc-options -threaded" al ejecutar los tests.
+
 Para listar todo las posibles baterías de prueba podemos utilizar el
 comando:
 
@@ -85,14 +127,14 @@ comando:
 Donde los casos de prueba serán los que figuren como
 `compiladores:test:...`.
 
-Dentro de cada archivo de prueba `VM.hs, Byte.hs` encontrarán como se
+Dentro de cada archivo de prueba `C.hs, Byte.hs` encontrarán como se
 define la ejecución de las pruebas. Para esto se utiliza una función que
 provee la catedra definida en el archivo [file:Spec.hs](Spec.hs) :
 
 ``` haskell
 runTestWith :: String -> IO ()
 runTestWith script = do
-  bbts <- blackBoxTests "test/cases" script ".fd4" bbTArg
+  bbts <- blackBoxTests "test/correctos" script ".fd4" bbTArg
   htfMain ([makeTestSuite "bbts" bbts])
   where
     bbTArg = defaultBBTArgs
