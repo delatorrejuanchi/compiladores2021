@@ -71,9 +71,8 @@ closeN ns = varChanger lcl (\_ p i -> V p (Bound i))
 substN :: [Term] -> Term -> Term
 substN ns = varChanger (\_ p n -> V p (Free n)) bnd
    where bnd depth p i
-             | i <  depth = V p (Bound i)
-             | i >= depth && i < depth + nns
-                = ns !! (i - depth)
+             | i < depth = V p (Bound i)
+             | i >= depth && i < depth + nns = ns !! (i - depth)
              | otherwise = abort "substN: M is not LC"
          nns = length ns
 

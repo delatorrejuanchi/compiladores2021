@@ -5,7 +5,7 @@ module Optimize where
 import Eval (semOp)
 import Lang
 import MonadFD4
-import Subst (subst)
+import Subst
 
 (<.>) :: MonadFD4 m => (Term -> Term) -> (Term -> m (Term, Bool)) -> (Term -> m (Term, Bool))
 (f <.> g) term = do
@@ -35,13 +35,17 @@ optimize' t = do
     else return (t', False)
 
 recursiveOptimize :: MonadFD4 m => Term -> m (Term, Bool)
-recursiveOptimize (Lam p n ty t) = (Lam p n ty <.> optimize') t
+recursiveOptimize (Lam p n ty t) = do
+  (t', tChanged) <- optimize' $ open n t
+  return (Lam p n ty (close n t'), tChanged)
 recursiveOptimize (App p u t) = do
   (u', uChanged) <- optimize' u
   (t', tChanged) <- optimize' t
   return (App p u' t', uChanged || tChanged)
 recursiveOptimize (Print p s t) = (Print p s <.> optimize') t
-recursiveOptimize (Fix p f fty x xty t) = (Fix p f fty x xty <.> optimize') t
+recursiveOptimize (Fix p f fty x xty t) = do
+  (t', tChanged) <- optimize' $ openN [x, f] t
+  return (Fix p f fty x xty (closeN [x, f] t'), tChanged)
 recursiveOptimize (IfZ p c t e) = do
   (c', cChanged) <- optimize' c
   (t', tChanged) <- optimize' t
@@ -49,8 +53,8 @@ recursiveOptimize (IfZ p c t e) = do
   return (IfZ p c' t' e', cChanged || tChanged || eChanged)
 recursiveOptimize (Let p n ty e t) = do
   (e', eChanged) <- optimize' e
-  (t', tChanged) <- optimize' t
-  return (Let p n ty e' t', eChanged || tChanged)
+  (t', tChanged) <- optimize' $ open n t
+  return (Let p n ty e' (close n t'), eChanged || tChanged)
 recursiveOptimize (BinaryOp p op t u) = do
   (t', tChanged) <- optimize' t
   (u', uChanged) <- optimize' u
