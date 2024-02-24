@@ -70,7 +70,7 @@ constantPropagation :: MonadFD4 m => Term -> m (Term, Bool)
 constantPropagation (Let _ _ _ c@(Const _ _) t) = return (subst c t, True)
 constantPropagation term = return (term, False)
 
-inlineExpansion :: Monad m => Term -> m (Term, Bool)
+inlineExpansion :: MonadFD4 m => Term -> m (Term, Bool)
 inlineExpansion (Let _ _ _ e t) = return (subst e t, True)
 inlineExpansion (App _ (Lam _ _ _ b) t) = return (subst t b, True)
 inlineExpansion term = return (term, False)

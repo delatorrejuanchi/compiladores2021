@@ -119,8 +119,8 @@ main = execParser opts >>= go
       runOrFail $ mapM_ (bytecompileFile opt) files
     go (RunVM, _, files) =
       runOrFail $ mapM_ bytecodeRun files
-    go (CC, _, files) =
-      runOrFail $ mapM_ ccFile files
+    go (CC, opt, files) =
+      runOrFail $ mapM_ (ccFile opt) files
 
 -- go (Canon,_, files) =
 --           runOrFail $ mapM_ canonFile files
@@ -224,13 +224,14 @@ bytecompileFile opt f = do
 bytecodeRun :: MonadFD4 m => FilePath -> m ()
 bytecodeRun = liftIO . bcRead >=> runBC
 
-ccFile :: MonadFD4 m => FilePath -> m ()
-ccFile f = do
+ccFile :: MonadFD4 m => Bool -> FilePath -> m ()
+ccFile opt f = do
   decls <- loadFile f
   mdecls <- mapM elabDecl decls
   let decls' = catMaybes mdecls
   mapM_ tcAddTy decls'
-  let irdecls = runCC decls'
+  decls'' <- if opt then mapM optimizeDecl decls' else return decls'
+  let irdecls = runCC decls''
   liftIO $ writeFile (fst (splitExtension f) ++ ".c") (ir2C (IrDecls irdecls))
   where
     tcAddTy :: MonadFD4 m => DeclTerm -> m ()

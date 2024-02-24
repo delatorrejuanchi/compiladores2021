@@ -110,6 +110,18 @@ tests:
     dependencies:
       - compiladores
       - HTF
+  # Bytecode Optimized Test Suite
+  BytecodeOptimized:
+    main: ByteOptimized.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is ByteOptimized
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
   # C Backend Test Suite
   C:
     main: C.hs
@@ -122,3 +134,16 @@ tests:
     dependencies:
       - compiladores
       - HTF
+  # C Optimized Backend Test Suite
+  COptimized:
+    main: COptimized.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is COptimized
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
+
