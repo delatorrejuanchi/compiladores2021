@@ -98,6 +98,18 @@ tests:
     dependencies:
       - compiladores
       - HTF
+  # RunCEK Optimized Test Suite
+  RunCEKOptimized:
+    main: RunCEKOptimized.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is RunCEKOptimized
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
   # Bytecode Test Suite
   Bytecode:
     main: Byte.hs
