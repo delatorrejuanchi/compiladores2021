@@ -40,7 +40,7 @@ import System.Console.Haskeline
 import System.Exit
 import System.FilePath (splitExtension)
 import System.IO (hPrint, hPutStrLn, stderr)
-import TypeChecker (tc, tcDecl)
+import TypeChecker (tcTerm, tcDecl)
 
 prompt :: String
 prompt = "FD4> "
@@ -201,25 +201,21 @@ typecheckFile opt f = do
   decls' <- mapM (handleSDecl opt) decls
   mapM_ (printFD4 <=< ppDecl) (catMaybes decls')
 
+declsToTerm :: [DeclTerm] -> Term
+declsToTerm [] = error "No main function"
+declsToTerm [Decl _ _ _ t] = t
+declsToTerm (Decl p n ty t : ds) = Let p n ty t (close n (glob2free (declsToTerm ds)))
+
 bytecompileFile :: MonadFD4 m => Bool -> FilePath -> m ()
 bytecompileFile opt f = do
   decls <- loadFile f
   mdecls <- mapM elabDecl decls
   let decls' = catMaybes mdecls
-  mapM_ addTcDecl decls'
-  t <- if opt then optimize (transform decls') else return (transform decls')
+  let term = declsToTerm decls'
+  tcTerm term
+  t <- if opt then optimize term else return term
   bytecode <- bytecompile t
   liftIO $ bcWrite bytecode (fst (splitExtension f) ++ ".byte")
-  where
-    transform :: [DeclTerm] -> Term
-    transform [] = error "No main function"
-    transform [Decl _ _ _ t] = t
-    transform (Decl p n ty t : ds) = Let p n ty t (close n (glob2free (transform ds)))
-    addTcDecl :: MonadFD4 m => DeclTerm -> m ()
-    addTcDecl decl = do
-      ty <- tcDecl decl
-      addTy (declName decl) ty
-      addDecl decl
 
 bytecodeRun :: MonadFD4 m => FilePath -> m ()
 bytecodeRun = liftIO . bcRead >=> runBC
@@ -367,8 +363,7 @@ handleSNTerm t mode opt = do
 
 handleTerm :: MonadFD4 m => Term -> Mode -> Bool -> m ()
 handleTerm t mode opt = do
-  s <- get
-  ty <- tc t (tyEnv s)
+  ty <- tcTerm t
   t' <- if opt then optimize t else return t
   te <- evalTerm mode t'
   displayResult mode te ty
@@ -406,6 +401,5 @@ typeCheckPhrase :: MonadFD4 m => String -> m ()
 typeCheckPhrase x = do
   t <- parseIO "<interactive>" tm x
   t' <- elab t
-  s <- get
-  ty <- tc t' (tyEnv s)
+  ty <- tcTerm t'
   printFD4 (ppTy ty)
