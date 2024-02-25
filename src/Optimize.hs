@@ -21,13 +21,7 @@ optimize :: MonadFD4 m => Term -> m Term
 optimize t = fst <$> optimize' 0 t
 
 optimize' :: MonadFD4 m => Int -> Optimizer m
-optimize' d t = do
-  (t', changed) <- (constantFolding <||> constantPropagation <||> inlineExpansion <||> recursiveOptimize d) t
-  if changed
-    then do
-      (t'', _) <- optimize' d t'
-      return (t'', True)
-    else return (t', False)
+optimize' d = constantFolding <||> constantPropagation <||> inlineExpansion <||> recursiveOptimize d
 
 recursiveOptimize :: MonadFD4 m => Int -> Optimizer m
 recursiveOptimize d (Lam p n ty t) = do
