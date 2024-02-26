@@ -14,6 +14,13 @@ type Optimizer m = Term -> m (Term, Bool)
     then return (fterm, True)
     else g term
 
+(<&&>) :: MonadFD4 m => Optimizer m -> Optimizer m -> Optimizer m
+(f <&&> g) term = do
+  (fterm, fchanged) <- f term
+  if fchanged
+    then g fterm
+    else return (fterm, False)
+
 optimizeDecl :: MonadFD4 m => DeclTerm -> m DeclTerm
 optimizeDecl (Decl p n ty t) = Decl p n ty <$> optimize t
 
@@ -21,13 +28,7 @@ optimize :: MonadFD4 m => Term -> m Term
 optimize t = fst <$> optimize' 0 t
 
 optimize' :: MonadFD4 m => Int -> Optimizer m
-optimize' d t = do
-  (t', changed) <- (constantFolding <||> constantPropagation <||> inlineExpansion <||> recursiveOptimize d) t
-  if changed
-    then do
-      (t'', _) <- optimize' d t'
-      return (t'', True)
-    else return (t', False)
+optimize' d = (constantFolding <||> constantPropagation <||> inlineExpansion <||> recursiveOptimize d) <&&> optimize' d
 
 recursiveOptimize :: MonadFD4 m => Int -> Optimizer m
 recursiveOptimize d (Lam p n ty t) = do
