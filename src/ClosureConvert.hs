@@ -56,7 +56,7 @@ closureConvert (Fix _ f _ x _ t) = do
   xnn <- newName x
   fnn <- newName $ "rec_" ++ f
   let clname = fnn ++ "_args"
-  t' <- closureConvert (openN [clname, xnn] t)
+  t' <- closureConvert (openN [xnn, clname] t)
   let fv = freeVars t
       ff = closeIr fv t' clname
       codef = IrFun fnn [clname, xnn] ff

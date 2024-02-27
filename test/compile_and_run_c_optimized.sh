@@ -2,7 +2,7 @@
 
 filename="${@%.*}"
 # echo "Compiling and Running $filename  ($PWD)"
-stack run -- -c "$@"
+stack run -- -o -c "$@"
 gcc runtime.c -lgc $filename.c
 ./a.out
 rm a.out

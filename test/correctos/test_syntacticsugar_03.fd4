@@ -1,0 +1,5 @@
+let f : Nat -> Nat -> Nat = fun (x : Nat) (y : Nat) -> x + y
+
+let g (x : Nat) (y : Nat) : Nat = x + y
+
+let res : Nat = let h (x : Nat) (y : Nat) : Nat = f x y + g x y in h 1 2

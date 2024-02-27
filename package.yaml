@@ -62,12 +62,72 @@ executables:
     - compiladores
 
 tests:
+  # Run Test Suite
+  Run:
+    main: Run.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is Run
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
+  # RunOptimized Test Suite
+  RunOptimized:
+    main: RunOptimized.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is RunOptimized
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
+  # RunCEK Test Suite
+  RunCEK:
+    main: RunCEK.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is RunCEK
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
+  # RunCEK Optimized Test Suite
+  RunCEKOptimized:
+    main: RunCEKOptimized.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is RunCEKOptimized
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
   # Bytecode Test Suite
   Bytecode:
     main: Byte.hs
     source-dirs: test
     ghc-options:
       - -main-is Byte
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
+  # Bytecode Optimized Test Suite
+  BytecodeOptimized:
+    main: ByteOptimized.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is ByteOptimized
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
@@ -86,3 +146,16 @@ tests:
     dependencies:
       - compiladores
       - HTF
+  # C Optimized Backend Test Suite
+  COptimized:
+    main: COptimized.hs
+    source-dirs: test
+    ghc-options:
+      - -main-is COptimized
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - compiladores
+      - HTF
+

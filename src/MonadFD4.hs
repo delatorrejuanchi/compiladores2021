@@ -16,9 +16,11 @@ module MonadFD4
   ( FD4,
     runFD4,
     maybeGetDecl,
+    getLastDecl,
     lookupTy,
     lookupTypeSynonym,
     printFD4,
+    printFD4_,
     setLastFile,
     getLastFile,
     eraseLastFileDecls,
@@ -65,6 +67,9 @@ putCharFD4 = liftIO . putChar
 printFD4 :: MonadFD4 m => String -> m ()
 printFD4 = liftIO . putStrLn
 
+printFD4_ :: MonadFD4 m => String -> m ()
+printFD4_ = liftIO . putStr
+
 setLastFile :: MonadFD4 m => FilePath -> m ()
 setLastFile filename = modify (\s -> s {lfile = filename})
 
@@ -99,6 +104,13 @@ maybeGetDecl nm = do
   case filter (hasName nm) (glb s) of
     Decl {declBody = e} : _ -> return (Just e)
     [] -> return Nothing
+
+getLastDecl :: MonadFD4 m => m (Maybe DeclTerm)
+getLastDecl = do
+  s <- get
+  case glb s of
+    [] -> return Nothing
+    d : _ -> return (Just d)
 
 lookupTy :: MonadFD4 m => Name -> m (Maybe Ty)
 lookupTy nm = gets (lookup nm . tyEnv)

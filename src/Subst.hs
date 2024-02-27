@@ -35,7 +35,7 @@ varChanger local bound t = go 0 t where
   go n (BinaryOp p op t u)   = BinaryOp p op (go n t) (go n u)
   go n (Let p v vty m o)     = Let p v vty (go n m) (go (n+1) o)
 
--- `openN [nn,..,n0] t` reemplaza las primeras (n+1) variables ligadas
+-- `openN [n0,..,nn] t` reemplaza las primeras (n+1) variables ligadas
 -- en `t` (que debe ser localmente cerrado) por los nombres libres en la
 -- lista. La variable Bound 0 pasa a ser Free n0, y etc. Estos nombres
 -- deben ser frescos en el término para que no ocurra shadowing.
@@ -43,43 +43,38 @@ openN :: [Name] -> Term -> Term
 openN ns = varChanger (\_ p n -> V p (Free n)) bnd where
    bnd depth p i | i <  depth = V p (Bound i)
                  | i >= depth && i < depth + nns =
-                    V p (Free (nsr !! (i - depth)))
+                    V p (Free (ns !! (i - depth)))
                  | otherwise  = abort "openN: M is not LC"
    nns = length ns
-   nsr = reverse ns
 
--- `closeN [nn,..,n0] t` es la operación inversa a open. Reemplaza
+-- `closeN [n0,..,nn] t` es la operación inversa a open. Reemplaza
 -- las variables `Free ni` por la variable ligada `Bound i`.
 closeN :: [Name] -> Term -> Term
 closeN ns = varChanger lcl (\_ p i -> V p (Bound i))
    where lcl depth p y =
-            case elemIndex y nsr of
+            case elemIndex y ns of
               Just i  -> V p (Bound (i + depth))
               Nothing -> V p (Free y)
-         nsr = reverse ns
 
--- `substN [tn,..,t0] t` sustituye los índices de de Bruijn en t con
--- los términos de la lista. Bound 0 pasa a t0, etc. Notar el orden
--- inverso para hacer las llamadas más intuitivas.
+-- `substN [t0,..,tn] t` sustituye los índices de de Bruijn en t con
+-- los términos de la lista. Bound 0 pasa a t0, etc.
 --
 -- El término `t` debe tener a lo sumo tantos índices abiertos como la
 -- longitud de la lista. Si es localmente cerrado (es decir que no tiene
 -- índices abiertos), nada va a ser sustituido.
 --
 -- Puede pensarse como una optimizacíon de primero hacer `open
--- [nn,..,n0] t`, con nombres frescos, y luego sustituir los nombres
+-- [n0,...,nn] t`, con nombres frescos, y luego sustituir los nombres
 -- por los términos correspondientes. La ventaja es que no hace falta
 -- generar ningún nombre, y por lo tanto evitamos la necesidad de
 -- nombres frescos.
 substN :: [Term] -> Term -> Term
 substN ns = varChanger (\_ p n -> V p (Free n)) bnd
    where bnd depth p i
-             | i <  depth = V p (Bound i)
-             | i >= depth && i < depth + nns
-                = nsr !! (i - depth)
+             | i < depth = V p (Bound i)
+             | i >= depth && i < depth + nns = ns !! (i - depth)
              | otherwise = abort "substN: M is not LC"
          nns = length ns
-         nsr = reverse ns
 
 -- Algunas definiciones auxiliares:
 

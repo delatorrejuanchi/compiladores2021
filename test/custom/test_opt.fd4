@@ -1,3 +1,0 @@
-let rec mult (n m: Nat): Nat = ifz n then 0 else m + (mult (n - 1) m)
-
-let res: Nat = mult 3 4

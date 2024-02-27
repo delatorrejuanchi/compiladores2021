@@ -7,6 +7,7 @@
 -- Stability   : experimental
 module PPrint
   ( pp,
+    ppDull,
     ppTy,
     ppName,
     ppDecl,
@@ -53,7 +54,7 @@ openAll ns (App p t u) = App p (openAll ns t) (openAll ns u)
 openAll ns (Fix p f fty x xty t) =
   let x' = freshen ns x
       f' = freshen (x' : ns) f
-   in Fix p f' fty x' xty (openAll (x : f : ns) (openN [f', x'] t))
+   in Fix p f' fty x' xty (openAll (x : f : ns) (openN [x', f'] t))
 openAll ns (IfZ p c t e) = IfZ p (openAll ns c) (openAll ns t) (openAll ns e)
 openAll ns (Print p str t) = Print p str (openAll ns t)
 openAll ns (BinaryOp p op t u) = BinaryOp p op (openAll ns t) (openAll ns u)
@@ -195,6 +196,11 @@ pp :: MonadFD4 m => Term -> m String
 pp t = do
   gdecl <- gets glb
   return (render . t2doc False $ openAll (map declName gdecl) t)
+
+ppDull :: MonadFD4 m => Term -> m String
+ppDull t = do
+  gdecl <- gets glb
+  return (render . unAnnotate . t2doc False $ openAll (map declName gdecl) t)
 
 render :: Doc AnsiStyle -> String
 render = unpack . renderStrict . layoutSmart defaultLayoutOptions

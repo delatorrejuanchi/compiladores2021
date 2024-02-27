@@ -1,0 +1,3 @@
+let f : Nat -> Nat = print "x = "
+
+let res : Nat = f 10

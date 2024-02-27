@@ -5,7 +5,7 @@
 -- License     : GPL-3
 -- Maintainer  : mauro@fceia.unr.edu.ar
 -- Stability   : experimental
-module TypeChecker (tc, tcDecl) where
+module TypeChecker (tcTerm, tcDecl) where
 
 import Global
 import Lang
@@ -50,7 +50,7 @@ tc (Fix p f fty x xty t) bs = do
       p
       "El tipo del argumento de un fixpoint debe coincidir con el \
       \dominio del tipo de la función"
-  let t' = openN [f, x] t
+  let t' = openN [x, f] t
   ty' <- tc t' ((x, xty) : (f, fty) : bs)
   expect cod ty' t'
   return fty
@@ -88,13 +88,17 @@ domCod :: MonadFD4 m => Term -> Ty -> m (Ty, Ty)
 domCod t (FunTy d c) = return (d, c)
 domCod t ty = typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy ty
 
+tcTerm :: MonadFD4 m => Term -> m Ty
+tcTerm t = do
+  s <- get
+  tc t (tyEnv s)
+
 -- | 'tcDecl' chequea el tipo de una declaración, y verifica que no esté declarada.
 tcDecl :: MonadFD4 m => DeclTerm -> m Ty
 tcDecl (Decl p n ty t) = do
   mty <- lookupTy n
   case mty of
     Nothing -> do
-      s <- get
-      ty' <- tc t (tyEnv s)
+      ty' <- tcTerm t
       expect ty ty' t
     Just _ -> failPosFD4 p $ n ++ " ya está declarado"
